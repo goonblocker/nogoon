@@ -2,7 +2,7 @@ console.log('Content script loaded - v4 - Background Communication');
 
 // --- Global State ---
 let isEnabled = true; // TODO: Add mechanism to toggle this (e.g., via popup)
-const NSFW_THRESHOLD = 0.65; // Probability threshold for NSFW categories
+const NSFW_THRESHOLD = 0.2; // Probability threshold for NSFW categories
 
 // --- Styles ---
 const overlayStyles = `
