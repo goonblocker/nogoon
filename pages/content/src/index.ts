@@ -51,6 +51,19 @@ chrome.storage.local.onChanged.addListener((changes: { [key: string]: chrome.sto
       }
     }
   }
+
+  // Listen for paywall changes - when user runs out of blocks
+  if (changes['privy-auth-storage']) {
+    const newAuthState = changes['privy-auth-storage'].newValue;
+    if (newAuthState) {
+      const hitPaywall = !newAuthState.isPremium && newAuthState.freeBlocksRemaining === 0;
+      if (hitPaywall) {
+        console.log('[Content Script] User hit paywall (0 free blocks), stopping image processing');
+        // Clear processed images so if they upgrade, images will be reprocessed
+        // Note: WeakSet doesn't have a clear() method, so we just stop processing new ones
+      }
+    }
+  }
 });
 
 // --- Styles ---
@@ -277,6 +290,14 @@ async function processImage(img: HTMLImageElement) {
     return;
   }
 
+  // PAYWALL CHECK: Don't scan if user is out of free blocks and not premium
+  const canBlock = await privyAuthStorage.canBlock();
+  if (!canBlock) {
+    console.log('[Content Script] User out of free blocks, skipping image processing:', img.src);
+    processedImages.add(img); // Mark as processed so we don't keep trying
+    return;
+  }
+
   processedImages.add(img);
   console.log('[AIDEBUGLOGDETECTIVEWORK]: Added image to processedImages:', img.src);
   console.log('[Content Script] Processing image:', img.src);
@@ -356,29 +377,6 @@ async function processImage(img: HTMLImageElement) {
     } else if (result === 'disallowed') {
       console.log('[AIDEBUGLOGDETECTIVEWORK]: Image disallowed, setting overlay text for:', img.src);
       console.log('[Content Script] Image disallowed:', img.src);
-
-      // Check if user can block (has free blocks or is premium)
-      const canBlock = await privyAuthStorage.canBlock();
-
-      if (!canBlock) {
-        // User has no free blocks remaining and is not premium
-        console.log('[Content Script] User out of free blocks, showing paywall overlay');
-        overlay.classList.add('disallowed');
-        overlay.innerHTML = `
-          ${boobaIconHTML}
-          <div class="message">⚠️ Out of free blocks! Upgrade to premium for unlimited protection.</div>
-        `;
-        overlay.addEventListener(
-          'click',
-          () => {
-            console.log('[Content Script] Opening popup to upgrade');
-            // Open popup to show upgrade options
-            chrome.runtime.sendMessage({ type: 'openPopup' });
-          },
-          { once: true },
-        );
-        return;
-      }
 
       // User can block - decrement their free blocks count
       const remaining = await privyAuthStorage.decrementFreeBlocks();

@@ -27,6 +27,7 @@ async function loadNsfwModel() {
 // --- Message Listener ---
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('[AIDEBUGLOGDETECTIVEWORK]: Background script received message:', message);
+
   if (message.type === 'classifyImage' && message.imageUrl) {
     console.log('[Received classifyImage request for:', message.imageUrl);
     console.log('[AIDEBUGLOGDETECTIVEWORK]: Processing classifyImage request for URL:', message.imageUrl);
@@ -52,6 +53,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
     return true; // Indicates that the response is sent asynchronously
   }
+
+  // Handle opening side panel (for paywall, etc.)
+  if (message.type === 'openSidePanel') {
+    console.log('[Background] Opening side panel');
+    if (sender.tab?.windowId) {
+      chrome.sidePanel
+        .open({ windowId: sender.tab.windowId })
+        .then(() => {
+          console.log('[Background] Side panel opened successfully');
+          sendResponse({ status: 'success' });
+        })
+        .catch(error => {
+          console.error('[Background] Error opening side panel:', error);
+          sendResponse({ status: 'error', message: error.message });
+        });
+      return true; // Async response
+    }
+  }
+
   // Handle other message types if needed
   return false; // Indicates synchronous response or no response
 });
