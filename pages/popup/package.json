@@ -24,6 +24,7 @@
     "@extension/shared": "workspace:*",
     "@extension/storage": "workspace:*",
     "@extension/ui": "workspace:*",
+    "@privy-io/react-auth": "^3.0.1",
     "lucide-react": "^0.483.0"
   },
   "devDependencies": {

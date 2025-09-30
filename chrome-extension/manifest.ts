@@ -30,14 +30,17 @@ const manifest = {
   version: packageJson.version,
   description: '__MSG_extensionDescription__',
   host_permissions: ['<all_urls>'],
-  permissions: ['storage', 'scripting', 'tabs', 'notifications'],
+  permissions: ['storage', 'scripting', 'tabs', 'notifications', 'sidePanel'],
   background: {
     service_worker: 'background.js',
     type: 'module',
   },
   action: {
-    default_popup: 'popup/index.html',
     default_icon: 'icon-34-1.png',
+    default_title: 'Open NoGoon',
+  },
+  side_panel: {
+    default_path: 'popup/index.html',
   },
   chrome_url_overrides: {},
   icons: {
@@ -59,6 +62,10 @@ const manifest = {
       matches: ['*://*/*'],
     },
   ],
+  content_security_policy: {
+    extension_pages:
+      "script-src 'self'; object-src 'self'; connect-src 'self' https: wss: http://localhost:* ws://localhost:*;",
+  },
 } satisfies chrome.runtime.ManifestV3;
 
 export default manifest;

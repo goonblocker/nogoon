@@ -1,7 +1,8 @@
 import '@src/Popup.css';
 import { useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
-import { exampleThemeStorage, contentBlockingStorage } from '@extension/storage';
-import { useState } from 'react';
+import { exampleThemeStorage, contentBlockingStorage, privyAuthStorage } from '@extension/storage';
+import { useState, useEffect } from 'react';
+import { usePrivy, useWallets } from '@privy-io/react-auth';
 import {
   Shield,
   Settings,
@@ -17,18 +18,71 @@ import {
   Globe,
   Lock,
   ChevronLeft,
+  LogIn,
+  LogOut,
+  Crown,
+  Sparkles,
 } from 'lucide-react';
 import { Button, Switch, BlurFade } from '@extension/ui';
 
-type Screen = 'home' | 'stats' | 'settings';
+type Screen = 'home' | 'stats' | 'settings' | 'auth' | 'paywall';
 
 const Popup = () => {
   const theme = useStorage(exampleThemeStorage);
   const blockingState = useStorage(contentBlockingStorage);
-  const [currentScreen, setCurrentScreen] = useState<Screen>('home');
+  const authState = useStorage(privyAuthStorage);
+  const { login, logout, authenticated, user, ready } = usePrivy();
+  const { wallets } = useWallets();
+
+  // Start with auth screen - this is the default until user is authenticated
+  const [currentScreen, setCurrentScreen] = useState<Screen>('auth');
   const [blockAllSites, setBlockAllSites] = useState(false);
   const [showWarnings, setShowWarnings] = useState(true);
   const [safeSearch, setSafeSearch] = useState(true);
+
+  // AUTH GUARD: Force user to auth screen when not authenticated
+  useEffect(() => {
+    if (ready && !authenticated) {
+      console.log('[Popup] User not authenticated, forcing auth screen');
+      setCurrentScreen('auth');
+    }
+  }, [ready, authenticated]);
+
+  // Sync Privy auth state with our storage
+  useEffect(() => {
+    if (ready && authenticated && user) {
+      console.log('[Popup] User authenticated, syncing to storage');
+      const walletAddress = wallets?.[0]?.address || null;
+      privyAuthStorage.login(user.id, walletAddress).then(() => {
+        console.log('[Popup] Auth synced, user can access app');
+        // Auto-navigate to home after successful login
+        setCurrentScreen('home');
+      });
+    } else if (ready && !authenticated && authState.isAuthenticated) {
+      console.log('[Popup] User logged out, clearing storage');
+      privyAuthStorage.logout();
+    } else if (ready && !authenticated) {
+      // Fresh install or logged out - ensure storage is clear
+      console.log('[Popup] Not authenticated, ensuring storage is clear');
+      if (authState.isAuthenticated) {
+        privyAuthStorage.logout();
+      }
+    }
+  }, [ready, authenticated, user, wallets, authState.isAuthenticated]);
+
+  // Check if user should see paywall (only when authenticated)
+  useEffect(() => {
+    if (
+      authenticated &&
+      authState.freeBlocksRemaining === 0 &&
+      !authState.isPremium &&
+      currentScreen !== 'auth' &&
+      currentScreen !== 'paywall'
+    ) {
+      console.log('[Popup] Out of free blocks, showing paywall');
+      setCurrentScreen('paywall');
+    }
+  }, [authenticated, authState.freeBlocksRemaining, authState.isPremium, currentScreen]);
 
   // Handler for toggling protection
   const handleProtectionToggle = async (checked: boolean) => {
@@ -37,6 +91,123 @@ const Popup = () => {
       protectionActive: checked,
     }));
   };
+
+  // Handler for logout - ensures proper cleanup and navigation
+  const handleLogout = async () => {
+    console.log('[Popup] Logging out user');
+    setCurrentScreen('auth'); // Immediately switch to auth screen
+    await privyAuthStorage.logout(); // Clear storage
+    await logout(); // Logout from Privy
+    console.log('[Popup] Logout complete');
+  };
+
+  // Auth Screen
+  const renderAuth = () => (
+    <BlurFade delay={0.1} inView>
+      <div className="relative w-full h-full overflow-hidden">
+        <Star className="absolute top-4 right-6 w-10 h-10 text-primary/25 fill-primary/15 rotate-12" />
+        <Circle className="absolute bottom-16 left-4 w-8 h-8 text-primary/20 fill-primary/10" />
+
+        <div className="relative z-10 flex flex-col h-full p-4 items-center justify-center">
+          <div className="bg-gradient-to-br from-primary to-secondary rounded-full p-4 mb-4">
+            <Shield className="w-12 h-12 text-primary-foreground" />
+          </div>
+          <h2 className="text-2xl font-black tracking-tighter mb-2">Welcome to NoGoon</h2>
+          <p className="text-sm text-muted-foreground text-center mb-6 max-w-xs font-bold tracking-tighter">
+            Sign in to get 10 free daily blocks and protect your browsing experience
+          </p>
+
+          <Button
+            size="lg"
+            className="w-full max-w-xs h-12 rounded-full text-sm font-black tracking-tighter shadow-lg !bg-black  !text-white border-0 flex flex-row"
+            onClick={login}>
+            Sign In with Privy
+            <LogIn className="w-4 h-4 mr-2" />
+          </Button>
+
+          <p className="text-xs text-muted-foreground mt-4 text-center max-w-xs">
+            The side panel will stay open while you check your email for the verification code
+          </p>
+        </div>
+      </div>
+    </BlurFade>
+  );
+
+  // Paywall Screen
+  const renderPaywall = () => (
+    <BlurFade delay={0.1} inView>
+      <div className="relative w-full h-full overflow-hidden">
+        <Crown className="absolute top-4 right-6 w-12 h-12 text-yellow-400/30 fill-yellow-400/20 rotate-12" />
+        <Sparkles className="absolute bottom-16 left-4 w-10 h-10 text-purple-400/30 fill-purple-400/20" />
+
+        <div className="relative z-10 flex flex-col h-full p-4">
+          <div className="flex items-center justify-between mb-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full w-8 h-8"
+              onClick={() => setCurrentScreen('home')}>
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <h2 className="text-2xl font-black tracking-tighter">Upgrade</h2>
+            <div className="w-8" />
+          </div>
+
+          <div className="bg-gradient-to-br from-yellow-500 to-orange-500 rounded-2xl p-6 shadow-lg mb-4 text-white text-center">
+            <Crown className="w-16 h-16 mx-auto mb-3" />
+            <h3 className="text-2xl font-black tracking-tighter mb-2">Out of Free Blocks!</h3>
+            <p className="text-sm font-bold tracking-tighter opacity-90">You've used all {10} free daily blocks</p>
+          </div>
+
+          <div className="bg-card rounded-2xl p-4 border-2 border-primary mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="w-5 h-5 text-primary" />
+              <h4 className="text-lg font-black tracking-tighter">Premium Benefits</h4>
+            </div>
+            <ul className="space-y-2 text-sm font-bold tracking-tighter">
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-primary" />
+                Unlimited daily blocks
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-primary" />
+                Priority support
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-primary" />
+                Advanced filtering options
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-primary" />
+                Support development
+              </li>
+            </ul>
+          </div>
+
+          <div className="space-y-2 mt-auto">
+            <Button
+              size="lg"
+              className="w-full h-12 rounded-full text-sm font-black tracking-tighter shadow-lg bg-gradient-to-r from-yellow-500 to-orange-500"
+              onClick={async () => {
+                // TODO: Integrate actual payment flow
+                await privyAuthStorage.upgradeToPremium();
+                setCurrentScreen('home');
+              }}>
+              <Crown className="w-4 h-4 mr-2" />
+              Upgrade to Premium - $4.99/mo
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="w-full h-10 rounded-full text-xs font-black tracking-tighter border-2 bg-transparent"
+              onClick={() => setCurrentScreen('home')}>
+              Maybe Later
+            </Button>
+          </div>
+        </div>
+      </div>
+    </BlurFade>
+  );
 
   // Main Dashboard Screen
   const renderHome = () => (
@@ -52,13 +223,18 @@ const Popup = () => {
         <div className="relative z-10 flex flex-col h-full p-4">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-3xl font-black tracking-tighter">nogoon</h1>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full w-8 h-8"
-              onClick={() => setCurrentScreen('settings')}>
-              <Settings className="w-4 h-4" />
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="icon" className="rounded-full w-8 h-8" onClick={handleLogout}>
+                <LogOut className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full w-8 h-8"
+                onClick={() => setCurrentScreen('settings')}>
+                <Settings className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
 
           <div className="bg-card rounded-2xl p-3 shadow-lg mb-3 border-2 border-border">
@@ -75,6 +251,44 @@ const Popup = () => {
               <Switch checked={blockingState.protectionActive} onCheckedChange={handleProtectionToggle} />
             </div>
           </div>
+
+          {/* Free Blocks Counter */}
+          {!authState.isPremium && (
+            <div className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl p-4 shadow-lg mb-3 text-white">
+              <div className="flex items-center gap-2 mb-1">
+                <Sparkles className="w-5 h-5" />
+                <p className="text-sm font-black tracking-tighter">Free Blocks Remaining</p>
+              </div>
+              <p className="text-4xl font-black tracking-tighter mb-0.5">{authState.freeBlocksRemaining} / 10</p>
+              <p className="text-xs font-bold tracking-tighter opacity-90">
+                {authState.freeBlocksRemaining === 0
+                  ? 'Upgrade for unlimited!'
+                  : authState.freeBlocksRemaining < 3
+                    ? 'Running low! Consider upgrading'
+                    : 'Resets daily'}
+              </p>
+              {authState.freeBlocksRemaining < 5 && (
+                <Button
+                  size="sm"
+                  className="w-full mt-2 h-8 rounded-full text-xs font-black tracking-tighter bg-white text-purple-600 hover:bg-gray-100"
+                  onClick={() => setCurrentScreen('paywall')}>
+                  <Crown className="w-3 h-3 mr-1" />
+                  Upgrade Now
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* Premium Badge */}
+          {authState.isPremium && (
+            <div className="bg-gradient-to-br from-yellow-500 to-orange-500 rounded-2xl p-4 shadow-lg mb-3 text-white">
+              <div className="flex items-center gap-2 mb-1">
+                <Crown className="w-5 h-5" />
+                <p className="text-sm font-black tracking-tighter">Premium Active</p>
+              </div>
+              <p className="text-lg font-black tracking-tighter">Unlimited Blocks ∞</p>
+            </div>
+          )}
 
           <div className="bg-gradient-to-br from-primary to-secondary rounded-2xl p-4 shadow-lg mb-3 text-primary-foreground">
             <div className="flex items-center gap-2 mb-1">
@@ -287,11 +501,38 @@ const Popup = () => {
     </BlurFade>
   );
 
+  // AUTHENTICATION GUARD: Don't render protected screens if not authenticated
+  // This prevents flash of wrong content and enforces login requirement
+
+  console.log('[Popup Render] ready:', ready, 'authenticated:', authenticated, 'currentScreen:', currentScreen);
+
+  if (!ready) {
+    console.log('[Popup Render] Privy not ready, showing loading screen');
+    return (
+      <div className="w-full h-full flex flex-col bg-background items-center justify-center">
+        <div className="text-center">
+          <Shield className="w-12 h-12 mx-auto mb-3 text-primary animate-pulse" />
+          <p className="text-sm font-bold tracking-tighter text-muted-foreground">Initializing...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authenticated) {
+    // FORCE AUTH SCREEN: User must login before accessing any other screen
+    console.log('[Popup Render] Not authenticated, forcing auth screen');
+    return <div className="w-full h-full flex flex-col bg-background">{renderAuth()}</div>;
+  }
+
+  // User is authenticated - show the requested screen
+  console.log('[Popup Render] Authenticated, showing screen:', currentScreen);
   return (
     <div className="w-full h-full flex flex-col bg-background">
+      {currentScreen === 'paywall' && renderPaywall()}
       {currentScreen === 'home' && renderHome()}
       {currentScreen === 'stats' && renderStats()}
       {currentScreen === 'settings' && renderSettings()}
+      {currentScreen === 'auth' && renderAuth()}
     </div>
   );
 };

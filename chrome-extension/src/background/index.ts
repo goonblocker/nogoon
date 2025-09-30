@@ -141,6 +141,14 @@ async function handleImageClassification(imageUrl: string): Promise<nsfwjs.Predi
   }
 }
 
+// --- Side Panel Setup ---
+// Configure the side panel to open when the action icon is clicked
+chrome.sidePanel
+  .setPanelBehavior({ openPanelOnActionClick: true })
+  .catch(error => console.error('Error setting side panel behavior:', error));
+
+console.log('Side panel configured to open on action click.');
+
 // --- Existing Code ---
 // Keep other background script logic like theme storage if needed
 exampleThemeStorage.get().then(theme => {
