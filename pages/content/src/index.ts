@@ -22,18 +22,29 @@ chrome.storage.local.onChanged.addListener((changes: { [key: string]: chrome.sto
       isEnabled = newState.protectionActive;
       console.log('[Content Script] Protection state changed:', oldEnabled, '->', isEnabled);
 
-      // If protection was just disabled, remove all existing overlays
+      // If protection was just disabled, unwrap all images and remove overlays
       if (oldEnabled && !isEnabled) {
-        console.log('[Content Script] Removing all existing overlays...');
-        document.querySelectorAll('.content-blocker-overlay').forEach(overlay => {
-          overlay.remove();
+        console.log('[Content Script] Disabling protection, unwrapping all images...');
+        document.querySelectorAll('.content-blocker-container').forEach(container => {
+          const img = container.querySelector('img');
+          if (img) {
+            // Remove from processed set so it can be reprocessed later
+            processedImages.delete(img);
+            // Unwrap the image
+            unwrapImage(img, container as HTMLElement);
+          }
         });
       }
 
       // If protection was just enabled, reprocess all images
       if (!oldEnabled && isEnabled) {
-        console.log('[Content Script] Re-enabling protection, processing images...');
-        // WeakSet doesn't have clear(), so we need to reprocess regardless
+        console.log('[Content Script] Re-enabling protection, processing all images...');
+        // Force reprocess by clearing processed state for all existing wrapped images
+        document.querySelectorAll('.content-blocker-container img').forEach(img => {
+          processedImages.delete(img as HTMLImageElement);
+        });
+
+        // Process all images on the page
         document.querySelectorAll('img').forEach(img => {
           processImage(img);
         });
@@ -45,43 +56,67 @@ chrome.storage.local.onChanged.addListener((changes: { [key: string]: chrome.sto
 // --- Styles ---
 const overlayStyles = `
   .content-blocker-container {
-    position: relative; /* Crucial for absolute positioning of overlay */
-    display: inline-block; /* Default, adjust as needed */
-    vertical-align: bottom; /* Align with image baseline */
-    line-height: 0; /* Prevent extra space below image */
+    position: relative !important; /* Crucial for absolute positioning of overlay */
+    display: inline-block !important; /* Default, adjust as needed */
+    vertical-align: bottom !important; /* Align with image baseline */
+    line-height: 0 !important; /* Prevent extra space below image */
+    overflow: hidden !important; /* Ensure overlay doesn't extend beyond container */
+    max-width: 100% !important;
   }
   .content-blocker-container img {
-      display: block; /* Prevent extra space below image */
+    display: block !important; /* Prevent extra space below image */
+    max-width: 100% !important;
+    height: auto !important;
   }
   .content-blocker-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(5px); /* Default blur for scanning */
-    -webkit-backdrop-filter: blur(5px);
-    z-index: 9998;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-    font-family: sans-serif;
-    font-size: 12px;
-    color: white;
-    padding: 5px;
-    box-sizing: border-box;
-    border-radius: 4px;
-    cursor: default; /* Default cursor */
-    opacity: 1;
-    transition: opacity 0.3s ease, backdrop-filter 0.3s ease, background-color 0.3s ease;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    background-color: rgba(0, 0, 0, 0.6) !important;
+    backdrop-filter: blur(5px) !important; /* Default blur for scanning */
+    -webkit-backdrop-filter: blur(5px) !important;
+    z-index: 9998 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    text-align: center !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    color: white !important;
+    padding: 10px !important;
+    box-sizing: border-box !important;
+    cursor: default !important; /* Default cursor */
+    opacity: 1 !important;
+    transition: opacity 0.3s ease, backdrop-filter 0.3s ease, background-color 0.3s ease !important;
   }
   .content-blocker-overlay.disallowed {
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    background-color: rgba(0, 0, 0, 0.7);
-    cursor: pointer; /* Allow clicking to reveal */
+    backdrop-filter: blur(25px) !important;
+    -webkit-backdrop-filter: blur(25px) !important;
+    background-color: rgba(0, 0, 0, 0.75) !important;
+    cursor: pointer !important; /* Allow clicking to reveal */
+  }
+  .content-blocker-overlay .eye-icon {
+    width: 48px !important;
+    height: 48px !important;
+    margin-bottom: 8px !important;
+    opacity: 0.95 !important;
+    flex-shrink: 0 !important;
+    display: block !important;
+    border-radius: 4px !important;
+  }
+  .content-blocker-overlay .message {
+    font-size: 13px !important;
+    line-height: 1.4 !important;
+    max-width: 200px !important;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5) !important;
+    flex-shrink: 0 !important;
   }
   /* State for fading out when allowed (handled by removing the element) */
 `;
@@ -90,6 +125,39 @@ const overlayStyles = `
 const styleSheet = document.createElement('style');
 styleSheet.textContent = overlayStyles;
 document.head.appendChild(styleSheet);
+
+// --- Random Messages ---
+const trollMessages = [
+  'oh my such big boobas',
+  'bro this one is worth gooning',
+  'sheesh 👀 you sure about this?',
+  'down catastrophically huh?',
+  'someone bonk this man',
+  'least horny internet user',
+  'touch grass challenge failed',
+  'my eyes... they need bleach',
+  'you really wanna see this?',
+  'certified goon moment™',
+  'the council says: no',
+  'begone, coomer!',
+  'not on my watch chief',
+];
+
+const standardMessage = 'Blocked by NoGoon';
+
+function getBlockMessage(): string {
+  // 15% chance to show a troll message, 85% chance to show standard message
+  const shouldShowTroll = Math.random() < 0.15;
+
+  if (shouldShowTroll) {
+    return trollMessages[Math.floor(Math.random() * trollMessages.length)];
+  }
+
+  return standardMessage;
+}
+
+// Booba gif icon
+const boobaIconHTML = `<img src="${chrome.runtime.getURL('/booba.gif')}" class="eye-icon" alt="NoGoon" />`;
 
 // --- Communication with Background ---
 async function classifyImageWithBackground(imageUrl: string): Promise<'allowed' | 'disallowed' | 'error'> {
@@ -260,9 +328,10 @@ async function processImage(img: HTMLImageElement) {
     return;
   }
 
-  // Adjust wrapper size to natural dimensions if needed
-  wrapper.style.width = `${img.naturalWidth}px`;
-  wrapper.style.height = `${img.naturalHeight}px`;
+  // Keep wrapper size to displayed dimensions (offsetWidth/Height) for proper overlay positioning
+  // This ensures the overlay centers on what's actually visible, not the natural image size
+  wrapper.style.width = `${img.offsetWidth}px`;
+  wrapper.style.height = `${img.offsetHeight}px`;
 
   // 5. Run the actual detection via background script
   try {
@@ -294,7 +363,14 @@ async function processImage(img: HTMLImageElement) {
       });
 
       overlay.classList.add('disallowed');
-      overlay.textContent = 'Blocked (click to reveal)';
+
+      // Create the overlay content with booba icon and message (mostly standard, occasionally troll)
+      const blockMessage = getBlockMessage();
+      overlay.innerHTML = `
+        ${boobaIconHTML}
+        <div class="message">${blockMessage}</div>
+      `;
+
       overlay.addEventListener(
         'click',
         () => {

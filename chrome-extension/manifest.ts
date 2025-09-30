@@ -55,7 +55,7 @@ const manifest = {
   ],
   web_accessible_resources: [
     {
-      resources: ['*.js', '*.css', '*.svg', 'icon-128-1.png', 'icon-34-1.png'],
+      resources: ['*.js', '*.css', '*.svg', 'icon-128-1.png', 'icon-34-1.png', 'booba.gif', 'nsfw_model/*'],
       matches: ['*://*/*'],
     },
   ],
