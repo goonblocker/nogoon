@@ -1,6 +1,6 @@
 import '@src/Popup.css';
 import { useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
-import { exampleThemeStorage } from '@extension/storage';
+import { exampleThemeStorage, contentBlockingStorage } from '@extension/storage';
 import { useState } from 'react';
 import {
   Shield,
@@ -24,11 +24,19 @@ type Screen = 'home' | 'stats' | 'settings';
 
 const Popup = () => {
   const theme = useStorage(exampleThemeStorage);
+  const blockingState = useStorage(contentBlockingStorage);
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
-  const [protectionActive, setProtectionActive] = useState(true);
   const [blockAllSites, setBlockAllSites] = useState(false);
   const [showWarnings, setShowWarnings] = useState(true);
   const [safeSearch, setSafeSearch] = useState(true);
+
+  // Handler for toggling protection
+  const handleProtectionToggle = async (checked: boolean) => {
+    await contentBlockingStorage.set(state => ({
+      ...state,
+      protectionActive: checked,
+    }));
+  };
 
   // Main Dashboard Screen
   const renderHome = () => (
@@ -59,10 +67,12 @@ const Popup = () => {
                 <Shield className="w-6 h-6 text-primary" />
                 <div>
                   <p className="text-xs text-muted-foreground font-bold tracking-tighter">Protection</p>
-                  <p className="text-lg font-black tracking-tighter">{protectionActive ? 'Active' : 'Inactive'}</p>
+                  <p className="text-lg font-black tracking-tighter">
+                    {blockingState.protectionActive ? 'Active' : 'Inactive'}
+                  </p>
                 </div>
               </div>
-              <Switch checked={protectionActive} onCheckedChange={setProtectionActive} className="scale-100" />
+              <Switch checked={blockingState.protectionActive} onCheckedChange={handleProtectionToggle} />
             </div>
           </div>
 
@@ -71,8 +81,16 @@ const Popup = () => {
               <BarChart3 className="w-5 h-5" />
               <p className="text-sm font-black tracking-tighter">Today's Blocks</p>
             </div>
-            <p className="text-4xl font-black tracking-tighter mb-0.5">47</p>
-            <p className="text-xs font-bold tracking-tighter opacity-90">You're doing great!</p>
+            <p className="text-4xl font-black tracking-tighter mb-0.5">{blockingState.todayBlockedCount}</p>
+            <p className="text-xs font-bold tracking-tighter opacity-90">
+              {blockingState.todayBlockedCount === 0
+                ? 'No blocks yet today'
+                : blockingState.todayBlockedCount < 10
+                  ? "You're doing great!"
+                  : blockingState.todayBlockedCount < 50
+                    ? 'Excellent protection!'
+                    : 'Outstanding work!'}
+            </p>
           </div>
 
           <div className="space-y-2 mt-auto">
@@ -122,14 +140,14 @@ const Popup = () => {
             <div className="w-8" />
           </div>
 
-          {/* Weekly Summary */}
+          {/* Total Summary */}
           <div className="bg-gradient-to-br from-secondary to-primary rounded-2xl p-4 shadow-lg mb-3 text-primary-foreground">
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp className="w-5 h-5" />
-              <p className="text-sm font-black tracking-tighter">This Week</p>
+              <p className="text-sm font-black tracking-tighter">Total Blocks</p>
             </div>
-            <p className="text-4xl font-black tracking-tighter mb-0.5">342</p>
-            <p className="text-xs font-bold tracking-tighter opacity-90">Blocks prevented</p>
+            <p className="text-4xl font-black tracking-tighter mb-0.5">{blockingState.blockedCount}</p>
+            <p className="text-xs font-bold tracking-tighter opacity-90">All-time protection</p>
           </div>
 
           {/* Daily Breakdown */}
@@ -139,8 +157,8 @@ const Popup = () => {
                 <div className="flex items-center gap-2">
                   <Clock className="w-5 h-5 text-primary" />
                   <div>
-                    <p className="text-xs font-bold tracking-tighter text-muted-foreground">Avg. Daily</p>
-                    <p className="text-xl font-black tracking-tighter">49</p>
+                    <p className="text-xs font-bold tracking-tighter text-muted-foreground">Today</p>
+                    <p className="text-xl font-black tracking-tighter">{blockingState.todayBlockedCount}</p>
                   </div>
                 </div>
                 <CheckCircle2 className="w-6 h-6 text-primary" />
@@ -152,11 +170,15 @@ const Popup = () => {
                 <div className="flex items-center gap-2">
                   <Shield className="w-5 h-5 text-secondary" />
                   <div>
-                    <p className="text-xs font-bold tracking-tighter text-muted-foreground">Protection Rate</p>
-                    <p className="text-xl font-black tracking-tighter">99.8%</p>
+                    <p className="text-xs font-bold tracking-tighter text-muted-foreground">Protection Status</p>
+                    <p className="text-xl font-black tracking-tighter">
+                      {blockingState.protectionActive ? 'Active' : 'Disabled'}
+                    </p>
                   </div>
                 </div>
-                <Star className="w-6 h-6 text-secondary fill-secondary" />
+                <Star
+                  className={`w-6 h-6 ${blockingState.protectionActive ? 'text-secondary fill-secondary' : 'text-muted-foreground'}`}
+                />
               </div>
             </div>
           </div>

@@ -1,11 +1,11 @@
 {
   "extensionDescription": {
     "description": "Extension description",
-    "message": "Chrome extension boilerplate developed with Vite, React and Typescript"
+    "message": "QUIT GOONING TOSAY"
   },
   "extensionName": {
     "description": "Extension name",
-    "message": "Chrome extension boilerplate"
+    "message": "NoGoon - Quit Gooning"
   },
   "toggleTheme": {
     "message": "Toggle theme"
@@ -15,7 +15,7 @@
   },
   "greeting": {
     "description": "Greeting message",
-    "message": "Hello, My name is $NAME$",
+    "message": "Hello NoGoon Member!",
     "placeholders": {
       "name": {
         "content": "$1",
@@ -25,6 +25,6 @@
   },
   "hello": {
     "description": "Placeholder example",
-    "message": "Hello $1"
+    "message": "Hello NoGoon Member! $1"
   }
 }

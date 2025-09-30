@@ -1,8 +1,46 @@
+import { contentBlockingStorage } from '@extension/storage';
+
 console.log('Content script loaded - v4 - Background Communication');
 
 // --- Global State ---
-let isEnabled = true; // TODO: Add mechanism to toggle this (e.g., via popup)
+let isEnabled = true; // Will be synced with storage
 const NSFW_THRESHOLD = 0.2; // Probability threshold for NSFW categories
+const processedImages = new WeakSet<HTMLImageElement>();
+
+// Initialize state from storage
+contentBlockingStorage.get().then(state => {
+  isEnabled = state.protectionActive;
+  console.log('[Content Script] Protection state initialized:', isEnabled);
+});
+
+// Listen for storage changes to update isEnabled in real-time
+chrome.storage.local.onChanged.addListener((changes: { [key: string]: chrome.storage.StorageChange }) => {
+  if (changes['content-blocking-storage']) {
+    const newState = changes['content-blocking-storage'].newValue;
+    if (newState && typeof newState.protectionActive === 'boolean') {
+      const oldEnabled = isEnabled;
+      isEnabled = newState.protectionActive;
+      console.log('[Content Script] Protection state changed:', oldEnabled, '->', isEnabled);
+
+      // If protection was just disabled, remove all existing overlays
+      if (oldEnabled && !isEnabled) {
+        console.log('[Content Script] Removing all existing overlays...');
+        document.querySelectorAll('.content-blocker-overlay').forEach(overlay => {
+          overlay.remove();
+        });
+      }
+
+      // If protection was just enabled, reprocess all images
+      if (!oldEnabled && isEnabled) {
+        console.log('[Content Script] Re-enabling protection, processing images...');
+        // WeakSet doesn't have clear(), so we need to reprocess regardless
+        document.querySelectorAll('img').forEach(img => {
+          processImage(img);
+        });
+      }
+    }
+  }
+});
 
 // --- Styles ---
 const overlayStyles = `
@@ -100,8 +138,6 @@ async function classifyImageWithBackground(imageUrl: string): Promise<'allowed' 
 }
 
 // --- Overlay Management ---
-
-const processedImages = new WeakSet<HTMLImageElement>();
 
 /**
  * Creates the overlay div element.
@@ -251,6 +287,12 @@ async function processImage(img: HTMLImageElement) {
     } else if (result === 'disallowed') {
       console.log('[AIDEBUGLOGDETECTIVEWORK]: Image disallowed, setting overlay text for:', img.src);
       console.log('[Content Script] Image disallowed:', img.src);
+
+      // Increment block count in storage
+      contentBlockingStorage.incrementBlockCount().catch(err => {
+        console.error('[Content Script] Failed to increment block count:', err);
+      });
+
       overlay.classList.add('disallowed');
       overlay.textContent = 'Blocked (click to reveal)';
       overlay.addEventListener(

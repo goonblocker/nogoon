@@ -37,11 +37,11 @@ const manifest = {
   },
   action: {
     default_popup: 'popup/index.html',
-    default_icon: 'icon-34.png',
+    default_icon: 'icon-34-1.png',
   },
   chrome_url_overrides: {},
   icons: {
-    '128': 'icon-128.png',
+    '128': 'icon-128-1.png',
   },
   content_scripts: [
     {
@@ -55,7 +55,7 @@ const manifest = {
   ],
   web_accessible_resources: [
     {
-      resources: ['*.js', '*.css', '*.svg', 'icon-128.png', 'icon-34.png'],
+      resources: ['*.js', '*.css', '*.svg', 'icon-128-1.png', 'icon-34-1.png'],
       matches: ['*://*/*'],
     },
   ],
