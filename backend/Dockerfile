@@ -8,13 +8,20 @@ WORKDIR /app
 COPY requirements.txt ./
 COPY *.py ./
 COPY app/ ./app/
+COPY start.sh ./
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Set default port for Railway
+ENV PORT=8000
+
 # Expose port
 EXPOSE $PORT
 
-# Start the FastAPI server
-CMD uvicorn main:app --host 0.0.0.0 --port $PORT
+# Make start script executable and use it
+RUN chmod +x start.sh
+
+# Start the FastAPI server with debug script
+CMD ["./start.sh"]
