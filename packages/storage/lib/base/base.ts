@@ -5,7 +5,7 @@ import { SessionAccessLevelEnum, StorageEnum } from './enums.js';
  * Chrome reference error while running `processTailwindFeatures` in tailwindcss.
  *  To avoid this, we need to check if the globalThis.chrome is available and add fallback logic.
  */
-const chrome = globalThis.chrome;
+const chrome = (globalThis as any).chrome;
 
 /**
  * Sets or updates an arbitrary cache with a new value or the result of an update function.
@@ -78,7 +78,7 @@ export function createStorage<D = string>(key: string, fallback: D, config?: Sto
       .setAccessLevel({
         accessLevel: SessionAccessLevelEnum.ExtensionPagesAndContentScripts,
       })
-      .catch(error => {
+      .catch((error: any) => {
         console.warn(error);
         console.warn('Please call setAccessLevel into different context, like a background script.');
       });
@@ -130,7 +130,7 @@ export function createStorage<D = string>(key: string, fallback: D, config?: Sto
   });
 
   // Listener for live updates from the browser
-  async function _updateFromStorageOnChanged(changes: { [key: string]: chrome.storage.StorageChange }) {
+  async function _updateFromStorageOnChanged(changes: { [key: string]: any }) {
     // Check if the key we are listening for is in the changes object
     if (changes[key] === undefined) return;
 

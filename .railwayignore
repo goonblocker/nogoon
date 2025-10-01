@@ -1,0 +1,30 @@
+# Ignore Node.js related files and directories to prevent multiple service detection
+node_modules/
+package.json
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+chrome-extension/
+tests/
+packages/
+pages/
+dist/
+.turbo/
+.next/
+.nuxt/
+.vite/
+
+# Ignore all directories except backend and required root files
+/*
+!/backend/
+!/railway.json
+!/nixpacks.toml
+!/.railwayignore
+
+# Ignore specific package.json files in subdirectories
+chrome-extension/package.json
+tests/*/package.json
+packages/*/package.json
+pages/*/package.json
+
+# Keep the main package.json but Railway should prioritize nixpacks.toml

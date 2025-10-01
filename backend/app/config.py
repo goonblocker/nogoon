@@ -14,9 +14,9 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     PORT: int = 8000
     
-    # Database - Railway PostgreSQL
-    DATABASE_URL: str
-    DATABASE_PUBLIC_URL: str
+    # Database - Railway PostgreSQL (optional for local development)
+    DATABASE_URL: str = ""
+    DATABASE_PUBLIC_URL: str = ""
     
     # Privy Configuration
     PRIVY_APP_ID: str
