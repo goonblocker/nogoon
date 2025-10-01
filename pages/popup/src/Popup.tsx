@@ -1,5 +1,12 @@
 import '@src/Popup.css';
-import { useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
+import {
+  useStorage,
+  withErrorBoundary,
+  withSuspense,
+  loginWithPrivy,
+  getSyncStatus,
+  isBackendAvailable,
+} from '@extension/shared';
 import { exampleThemeStorage, contentBlockingStorage, privyAuthStorage } from '@extension/storage';
 import { useState, useEffect } from 'react';
 import { usePrivy, useWallets } from '@privy-io/react-auth';
@@ -31,7 +38,7 @@ const Popup = () => {
   const theme = useStorage(exampleThemeStorage);
   const blockingState = useStorage(contentBlockingStorage);
   const authState = useStorage(privyAuthStorage);
-  const { login, logout, authenticated, user, ready } = usePrivy();
+  const { login, logout, authenticated, user, ready, getAccessToken } = usePrivy();
   const { wallets } = useWallets();
 
   // Start with auth screen - this is the default until user is authenticated
@@ -39,6 +46,8 @@ const Popup = () => {
   const [blockAllSites, setBlockAllSites] = useState(false);
   const [showWarnings, setShowWarnings] = useState(true);
   const [safeSearch, setSafeSearch] = useState(true);
+  const [backendAvailable, setBackendAvailable] = useState(true);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   // AUTH GUARD: Force user to auth screen when not authenticated
   useEffect(() => {
@@ -48,16 +57,65 @@ const Popup = () => {
     }
   }, [ready, authenticated]);
 
-  // Sync Privy auth state with our storage
+  // Check backend availability on mount
+  useEffect(() => {
+    const checkBackend = async () => {
+      const available = await isBackendAvailable();
+      setBackendAvailable(available);
+      if (!available) {
+        console.warn('[Popup] Backend is not available - running in offline mode');
+        setSyncError('Backend server unavailable. Running in offline mode.');
+      }
+    };
+    checkBackend();
+  }, []);
+
+  // Sync Privy auth state with our storage AND backend
   useEffect(() => {
     if (ready && authenticated && user) {
-      console.log('[Popup] User authenticated, syncing to storage');
-      const walletAddress = wallets?.[0]?.address || null;
-      privyAuthStorage.login(user.id, walletAddress).then(() => {
-        console.log('[Popup] Auth synced, user can access app');
-        // Auto-navigate to home after successful login
-        setCurrentScreen('home');
-      });
+      console.log('[Popup] User authenticated, syncing to storage and backend');
+
+      const syncAuth = async () => {
+        try {
+          const walletAddress = wallets?.[0]?.address || null;
+
+          // Sync to local storage first
+          await privyAuthStorage.login(user.id, walletAddress);
+          console.log('[Popup] Auth synced to local storage');
+
+          // Sync to backend if available
+          if (backendAvailable) {
+            try {
+              const accessToken = await getAccessToken();
+              if (accessToken) {
+                console.log('[Popup] Syncing auth to backend...');
+                const backendResponse = await loginWithPrivy(accessToken);
+                console.log('[Popup] Backend sync successful:', backendResponse);
+
+                // Update local storage with backend data
+                await privyAuthStorage.set(state => ({
+                  ...state,
+                  isPremium: backendResponse.is_premium,
+                  freeBlocksRemaining: backendResponse.free_blocks_remaining,
+                }));
+
+                setSyncError(null);
+              }
+            } catch (error) {
+              console.error('[Popup] Backend sync failed:', error);
+              setSyncError('Failed to sync with backend. Using local state.');
+            }
+          }
+
+          // Auto-navigate to home after successful login
+          setCurrentScreen('home');
+        } catch (error) {
+          console.error('[Popup] Auth sync error:', error);
+          setSyncError('Authentication sync failed');
+        }
+      };
+
+      syncAuth();
     } else if (ready && !authenticated && authState.isAuthenticated) {
       console.log('[Popup] User logged out, clearing storage');
       privyAuthStorage.logout();
@@ -68,7 +126,7 @@ const Popup = () => {
         privyAuthStorage.logout();
       }
     }
-  }, [ready, authenticated, user, wallets, authState.isAuthenticated]);
+  }, [ready, authenticated, user, wallets, authState.isAuthenticated, backendAvailable, getAccessToken]);
 
   // Check if user should see paywall (only when authenticated)
   useEffect(() => {

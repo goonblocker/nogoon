@@ -10,23 +10,30 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Create async engine
-# Use SQLite for development, PostgreSQL for production
-if settings.ENVIRONMENT == "development":
-    # Use SQLite for development (no external dependencies)
+# Always use PostgreSQL if DATABASE_URL is set, otherwise use SQLite
+if settings.DATABASE_URL and not settings.DATABASE_URL.startswith("sqlite"):
+    # Use PostgreSQL with asyncpg driver (development or production)
+    # Convert postgresql:// to postgresql+asyncpg:// for async support
+    db_url = settings.DATABASE_URL
+    if db_url.startswith("postgresql://"):
+        db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    
+    engine = create_async_engine(
+        db_url,
+        echo=settings.ENVIRONMENT == "development",
+        pool_pre_ping=True,
+        pool_size=10,
+        max_overflow=20
+    )
+    logger.info(f"Using PostgreSQL database with asyncpg")
+else:
+    # Use SQLite for local testing without Railway
     engine = create_async_engine(
         "sqlite+aiosqlite:///./nogoon.db",
         echo=True,
         pool_pre_ping=True
     )
-else:
-    # Use PostgreSQL for production
-    engine = create_async_engine(
-        settings.DATABASE_URL,
-        echo=False,
-        pool_pre_ping=True,
-        pool_size=10,
-        max_overflow=20
-    )
+    logger.info("Using SQLite database (local testing)")
 
 # Create session factory
 AsyncSessionLocal = async_sessionmaker(

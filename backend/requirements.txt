@@ -1,34 +1,35 @@
 # FastAPI and web server
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-python-multipart==0.0.6
+fastapi==0.115.2
+uvicorn[standard]==0.32.1
+python-multipart==0.0.20
 
-# Database - using compatible versions for Python 3.13
-sqlalchemy==2.0.23
-asyncpg==0.29.0
-alembic==1.12.1
+# Database - Python 3.13 compatible versions
+sqlalchemy==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
 
 # Authentication and Security
-pyjwt[crypto]==2.8.0
-cryptography==41.0.7
+pyjwt[crypto]==2.10.1
+cryptography==44.0.0
 python-jose[cryptography]==3.3.0
 
 # HTTP Client
-httpx==0.25.2
+httpx==0.28.1
 
-# Settings and Environment - using compatible versions
-pydantic==2.4.2
-pydantic-settings==2.0.3
-python-dotenv==1.0.0
+# Settings and Environment - Python 3.13 compatible
+pydantic[email]==2.10.5
+pydantic-settings==2.7.1
+python-dotenv==1.0.1
+email-validator==2.2.0
 
 # Rate Limiting
 slowapi==0.1.9
 
 # Logging
-python-json-logger==2.0.7
+python-json-logger==3.2.1
 
 # Utilities
-python-dateutil==2.8.2
+python-dateutil==2.9.0
 
 aiosqlite==0.21.0
 greenlet==3.2.4
