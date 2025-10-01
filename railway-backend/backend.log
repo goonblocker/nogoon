@@ -1,0 +1,23 @@
+Traceback (most recent call last):
+  File "/Users/alexalaniz/Documents/GitHub/content-blocking-extension/backend/main.py", line 15, in <module>
+    from app.database import engine, Base
+  File "/Users/alexalaniz/Documents/GitHub/content-blocking-extension/backend/app/database.py", line 16, in <module>
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+    ...<3 lines>...
+        max_overflow=20
+    )
+  File "/Users/alexalaniz/Documents/GitHub/content-blocking-extension/backend/venv/lib/python3.13/site-packages/sqlalchemy/ext/asyncio/engine.py", line 120, in create_async_engine
+    sync_engine = _create_engine(url, **kw)
+  File "<string>", line 2, in create_engine
+  File "/Users/alexalaniz/Documents/GitHub/content-blocking-extension/backend/venv/lib/python3.13/site-packages/sqlalchemy/util/deprecations.py", line 281, in warned
+    return fn(*args, **kwargs)  # type: ignore[no-any-return]
+  File "/Users/alexalaniz/Documents/GitHub/content-blocking-extension/backend/venv/lib/python3.13/site-packages/sqlalchemy/engine/create.py", line 546, in create_engine
+    u = _url.make_url(url)
+  File "/Users/alexalaniz/Documents/GitHub/content-blocking-extension/backend/venv/lib/python3.13/site-packages/sqlalchemy/engine/url.py", line 842, in make_url
+    return _parse_url(name_or_url)
+  File "/Users/alexalaniz/Documents/GitHub/content-blocking-extension/backend/venv/lib/python3.13/site-packages/sqlalchemy/engine/url.py", line 908, in _parse_url
+    raise exc.ArgumentError(
+        "Could not parse SQLAlchemy URL from string '%s'" % name
+    )
+sqlalchemy.exc.ArgumentError: Could not parse SQLAlchemy URL from string '║ DATABASE_PUBLIC_URL                 │ postgresql://                          ║'
