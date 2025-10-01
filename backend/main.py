@@ -13,7 +13,7 @@ import logging
 
 from app.config import settings
 from app.database import engine, Base
-from app.routes import auth, users, payments, sync
+from app.routes import auth, users, payments, sync, admin
 from app.middleware import log_requests
 
 # Configure logging
@@ -89,6 +89,7 @@ app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
 app.include_router(payments.router, prefix="/api/v1/payments", tags=["Payments"])
 app.include_router(sync.router, prefix="/api/v1/sync", tags=["Sync"])
+app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 
 # Root endpoint
 @app.get("/", tags=["Root"])
