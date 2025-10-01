@@ -31,6 +31,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Button, Switch, BlurFade } from '@extension/ui';
+import WalletManager from './components/WalletManager';
 
 type Screen = 'home' | 'stats' | 'settings' | 'auth' | 'paywall';
 
@@ -48,6 +49,7 @@ const Popup = () => {
   const [safeSearch, setSafeSearch] = useState(true);
   const [backendAvailable, setBackendAvailable] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [showWalletManager, setShowWalletManager] = useState(false);
 
   // AUTH GUARD: Force user to auth screen when not authenticated
   useEffect(() => {
@@ -79,9 +81,15 @@ const Popup = () => {
         try {
           const walletAddress = wallets?.[0]?.address || null;
 
+          // Extract all wallet info for storage
+          const allWallets = wallets.map(wallet => ({
+            address: wallet.address,
+            chainType: wallet.chainType as 'ethereum' | 'solana',
+          }));
+
           // Sync to local storage first
-          await privyAuthStorage.login(user.id, walletAddress);
-          console.log('[Popup] Auth synced to local storage');
+          await privyAuthStorage.login(user.id, walletAddress, allWallets);
+          console.log('[Popup] Auth synced to local storage with', allWallets.length, 'wallets');
 
           // Sync to backend if available
           if (backendAvailable) {
@@ -545,6 +553,13 @@ const Popup = () => {
 
             <Button
               size="lg"
+              onClick={() => setShowWalletManager(true)}
+              className="w-full h-10 rounded-full text-sm font-black tracking-tighter shadow-lg bg-gradient-to-r from-purple-600 to-blue-600">
+              💼 Manage Wallets
+            </Button>
+
+            <Button
+              size="lg"
               variant="outline"
               className="w-full h-9 rounded-full text-xs font-black tracking-tighter border-2 bg-transparent">
               Reset to Default
@@ -591,6 +606,9 @@ const Popup = () => {
       {currentScreen === 'stats' && renderStats()}
       {currentScreen === 'settings' && renderSettings()}
       {currentScreen === 'auth' && renderAuth()}
+
+      {/* Wallet Manager Modal */}
+      {showWalletManager && <WalletManager onClose={() => setShowWalletManager(false)} />}
     </div>
   );
 };

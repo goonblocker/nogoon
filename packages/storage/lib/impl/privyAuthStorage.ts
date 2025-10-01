@@ -1,17 +1,23 @@
 import type { BaseStorage } from '../base/index.js';
 import { createStorage, StorageEnum } from '../base/index.js';
 
+type WalletInfo = {
+  address: string;
+  chainType: 'ethereum' | 'solana';
+};
+
 type PrivyAuthState = {
   isAuthenticated: boolean;
   userId: string | null;
-  walletAddress: string | null;
+  walletAddress: string | null; // Primary wallet for backwards compatibility
+  wallets: WalletInfo[];
   isPremium: boolean;
   freeBlocksRemaining: number;
   lastFreeBlocksResetDate: string;
 };
 
 type PrivyAuthStorage = BaseStorage<PrivyAuthState> & {
-  login: (userId: string, walletAddress: string | null) => Promise<void>;
+  login: (userId: string, walletAddress: string | null, allWallets?: WalletInfo[]) => Promise<void>;
   logout: () => Promise<void>;
   upgradeToPremium: () => Promise<void>;
   decrementFreeBlocks: () => Promise<number>; // Returns remaining blocks
@@ -23,6 +29,7 @@ const defaultState: PrivyAuthState = {
   isAuthenticated: false,
   userId: null,
   walletAddress: null,
+  wallets: [],
   isPremium: false,
   freeBlocksRemaining: 10,
   lastFreeBlocksResetDate: new Date().toDateString(),
@@ -35,12 +42,13 @@ const storage = createStorage<PrivyAuthState>('privy-auth-storage', defaultState
 
 export const privyAuthStorage: PrivyAuthStorage = {
   ...storage,
-  login: async (userId: string, walletAddress: string | null) => {
+  login: async (userId: string, walletAddress: string | null, allWallets: WalletInfo[] = []) => {
     await storage.set(currentState => ({
       ...currentState,
       isAuthenticated: true,
       userId,
       walletAddress,
+      wallets: allWallets,
     }));
   },
   logout: async () => {
