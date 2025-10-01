@@ -19,12 +19,12 @@ class Settings(BaseSettings):
     DATABASE_PUBLIC_URL: str = ""
     
     # Privy Configuration
-    PRIVY_APP_ID: str
-    PRIVY_APP_SECRET: str
-    PRIVY_VERIFICATION_KEY: str  # For JWT validation
+    PRIVY_APP_ID: str = "dummy_app_id"
+    PRIVY_APP_SECRET: str = "dummy_app_secret"
+    PRIVY_VERIFICATION_KEY: str = "dummy_verification_key"  # For JWT validation
     
     # Security
-    SECRET_KEY: str
+    SECRET_KEY: str = "dummy_secret_key_for_development"
     ALLOWED_ORIGINS: List[str] = [
         "chrome-extension://kjmbccjnkgcpboiiomckhdogdhociajd",  # Replace with actual extension ID
         "http://localhost:3000",  # For development

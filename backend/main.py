@@ -33,16 +33,26 @@ async def lifespan(app: FastAPI):
     logger.info("Starting NoGoon Backend Server...")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
     
-    # Create database tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("Database tables created/verified")
+    # Create database tables (only if DATABASE_URL is provided)
+    if settings.DATABASE_URL:
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            logger.info("Database tables created/verified")
+        except Exception as e:
+            logger.warning(f"Database initialization failed: {e}")
+    else:
+        logger.info("No DATABASE_URL provided, skipping database initialization")
     
     yield
     
     # Shutdown
     logger.info("Shutting down NoGoon Backend Server...")
-    await engine.dispose()
+    if settings.DATABASE_URL:
+        try:
+            await engine.dispose()
+        except Exception as e:
+            logger.warning(f"Database cleanup failed: {e}")
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -78,11 +88,18 @@ app.middleware("http")(log_requests)
 @app.get("/health", tags=["Health"])
 async def health_check():
     """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "environment": settings.ENVIRONMENT,
-        "version": "1.0.0"
-    }
+    try:
+        return {
+            "status": "healthy",
+            "environment": settings.ENVIRONMENT,
+            "version": "1.0.0"
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy", 
+            "error": str(e),
+            "version": "1.0.0"
+        }
 
 # Include routers
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
