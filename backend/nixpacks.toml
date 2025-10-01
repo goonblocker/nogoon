@@ -1,5 +1,8 @@
+# Root nixpacks configuration for Railway deployment
+# This ensures only the backend is deployed
+
 [phases.setup]
-nixPkgs = ["python313"]
+nixPkgs = ["python311"]
 
 [phases.install]
 cmds = [
@@ -14,3 +17,6 @@ cmds = ["python init_db.py check || echo 'Database check skipped'"]
 [start]
 cmd = "uvicorn main:app --host 0.0.0.0 --port $PORT"
 
+# Explicitly set the providers to only Python
+[providers]
+python = true
