@@ -9,4 +9,5 @@ echo "Testing import..."
 python -c "import main; print('Import successful')" || echo "Import failed"
 
 echo "Starting uvicorn..."
+echo "Using PORT: ${PORT:-8000}"
 exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --log-level info
