@@ -1,7 +1,7 @@
 # Railway configuration for backend deployment
 [build]
 builder = "NIXPACKS"
-buildCommand = "pip install -r backend/requirements.txt"
+buildCommand = "python -m pip install -r backend/requirements.txt"
 
 [deploy]
 startCommand = "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
