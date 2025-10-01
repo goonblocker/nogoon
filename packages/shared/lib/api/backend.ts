@@ -6,8 +6,8 @@
  * No database credentials or sensitive data is exposed to the client.
  */
 
-// Backend API base URL - update this for production
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+// Backend API base URL - production Railway deployment
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'https://content-blocking-extension-production.up.railway.app';
 
 export interface UserData {
   user_id: string;
