@@ -7,6 +7,7 @@ import {
   getSyncStatus,
   isBackendAvailable,
   getUserStats,
+  syncBlockEvents,
 } from '@extension/shared';
 import { exampleThemeStorage, contentBlockingStorage, privyAuthStorage } from '@extension/storage';
 import { useState, useEffect } from 'react';
@@ -122,6 +123,55 @@ const Popup = () => {
       fetchUserStats();
     }
   }, [currentScreen, authenticated]);
+
+  // Auto-sync block events when popup opens and user is authenticated
+  useEffect(() => {
+    if (authenticated && ready && !hasSynced) {
+      // Small delay to ensure everything is loaded
+      const timer = setTimeout(() => {
+        syncBlockEventsToBackend();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [authenticated, ready, hasSynced]);
+
+  // Sync block events to backend
+  const syncBlockEventsToBackend = async () => {
+    if (!authenticated || !getAccessToken || !backendAvailable) {
+      console.warn('[Popup] Cannot sync block events - not authenticated or backend unavailable');
+      return;
+    }
+
+    try {
+      const accessToken = await getAccessToken();
+
+      // Get current blocking state and create events
+      const events = [];
+      if (blockingState.blockedSites && blockingState.blockedSites.length > 0) {
+        // Create events for each blocked site
+        for (const site of blockingState.blockedSites) {
+          events.push({
+            domain: site,
+            timestamp: new Date().toISOString(),
+            count: 1,
+          });
+        }
+      }
+
+      if (events.length > 0) {
+        console.log('[Popup] Syncing block events to backend:', events);
+        const response = await syncBlockEvents(accessToken, events);
+        console.log('[Popup] Block events synced:', response);
+
+        // Refresh stats after syncing
+        if (currentScreen === 'stats') {
+          fetchUserStats();
+        }
+      }
+    } catch (error) {
+      console.error('[Popup] Error syncing block events:', error);
+    }
+  };
 
   // Close theme menu when switching screens
   useEffect(() => {
@@ -705,11 +755,12 @@ const Popup = () => {
             <Button
               size="lg"
               className="w-full h-10 rounded-full text-sm font-black tracking-tighter shadow-lg"
-              onClick={() => {
-                // For now, just show an alert. In production, this could open a detailed analytics page
-                alert('Full analytics report coming soon! This will show detailed usage statistics and trends.');
+              onClick={async () => {
+                // Sync block events to backend and refresh stats
+                await syncBlockEventsToBackend();
+                alert('Block events synced! Your analytics have been updated with the latest data.');
               }}>
-              View Full Report
+              Sync & Refresh Analytics
             </Button>
           </div>
 

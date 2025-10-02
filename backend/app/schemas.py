@@ -129,6 +129,18 @@ class BlockUsageSync(BaseModel):
     is_premium_block: bool = False
 
 
+class BlockEvent(BaseModel):
+    """Schema for individual block events"""
+    domain: str = Field(..., description="Domain that was blocked")
+    timestamp: datetime = Field(default_factory=datetime.utcnow, description="When the block occurred")
+    count: int = Field(default=1, ge=1, description="Number of blocks for this domain")
+
+
+class BlockEventsRequest(BaseModel):
+    """Request schema for syncing block events"""
+    events: list[BlockEvent] = Field(..., description="List of block events to sync")
+
+
 class SyncRequest(BaseModel):
     """Request schema for syncing data from extension"""
     sync_type: Literal["blocks_update", "auth_sync", "full_sync"]

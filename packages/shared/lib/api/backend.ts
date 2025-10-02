@@ -45,6 +45,16 @@ export interface BlockUsage {
   is_premium_block: boolean;
 }
 
+export interface BlockEvent {
+  domain: string;
+  timestamp: string;
+  count: number;
+}
+
+export interface BlockEventsRequest {
+  events: BlockEvent[];
+}
+
 /**
  * Make authenticated API request to backend
  * Automatically includes Privy auth token in headers
@@ -272,6 +282,30 @@ export async function healthCheck(): Promise<{
   version: string;
 }> {
   return apiRequest('/health', { method: 'GET' });
+}
+
+/**
+ * Sync block events to backend
+ * Sends individual block events for analytics tracking
+ */
+export async function syncBlockEvents(
+  accessToken: string,
+  events: BlockEvent[],
+): Promise<{
+  status: string;
+  message: string;
+  events_processed: number;
+  total_blocks_added: number;
+  domains_processed: string[];
+}> {
+  return apiRequest(
+    '/api/v1/users/block-events',
+    {
+      method: 'POST',
+      body: JSON.stringify({ events }),
+    },
+    accessToken,
+  );
 }
 
 /**

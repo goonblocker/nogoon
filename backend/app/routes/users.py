@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 from app.database import get_db, set_current_user
 from app.models import User, BlocksUsage
-from app.schemas import UserResponse, UserUpdate, UsageStats, AnalyticsResponse
+from app.schemas import UserResponse, UserUpdate, UsageStats, AnalyticsResponse, BlockEventsRequest
 from app.privy_auth import get_current_user
 from app.config import settings
 import logging
@@ -168,6 +168,63 @@ async def get_user_stats(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve statistics"
+        )
+
+
+@router.post("/block-events")
+async def sync_block_events(
+    request: BlockEventsRequest,
+    user: User = Depends(get_auth_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Sync block events from extension to database"""
+    try:
+        # Check if database is available
+        if not settings.DATABASE_URL:
+            return {
+                "status": "success",
+                "message": "Block events received (mock mode - no database)",
+                "events_processed": len(request.events)
+            }
+        
+        total_blocks = 0
+        domains_processed = set()
+        
+        # Process each block event
+        for event in request.events:
+            # Create or update block usage record
+            block_usage = BlocksUsage(
+                user_id=user.user_id,
+                domain=event.domain,
+                blocks_used=event.count,
+                created_at=event.timestamp,
+                is_premium_block=False  # Default to free blocks
+            )
+            db.add(block_usage)
+            total_blocks += event.count
+            domains_processed.add(event.domain)
+        
+        # Update user's total blocks used
+        user.total_blocks_used += total_blocks
+        
+        await db.commit()
+        
+        logger.info(f"Synced {len(request.events)} block events for user {user.user_id}, total blocks: {total_blocks}")
+        
+        return {
+            "status": "success",
+            "message": "Block events synced successfully",
+            "events_processed": len(request.events),
+            "total_blocks_added": total_blocks,
+            "domains_processed": list(domains_processed)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error syncing block events: {e}")
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to sync block events"
         )
 
 
