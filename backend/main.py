@@ -38,8 +38,8 @@ async def lifespan(app: FastAPI):
     if settings.DATABASE_URL and "railway" in settings.DATABASE_URL:
         logger.info("Waiting for Railway database to be ready...")
         await asyncio.sleep(5)  # Wait 5 seconds for Railway database
-    
-                # Create database tables (only if DATABASE_URL is provided)
+
+    # Create database tables (only if DATABASE_URL is provided)
     if settings.DATABASE_URL:
         max_retries = 3
         for attempt in range(max_retries):
@@ -47,12 +47,12 @@ async def lifespan(app: FastAPI):
                 async with engine.begin() as conn:
                     await conn.run_sync(Base.metadata.create_all)
                 logger.info("Database tables created/verified")
-                            # Initialize RLS policies (safe to run repeatedly)
-                            try:
-                                await init_rls_policies()
-                                logger.info("RLS policies initialized/verified")
-                            except Exception as rls_error:
-                                logger.warning(f"RLS policy initialization skipped/failed: {rls_error}")
+                # Initialize RLS policies (safe to run repeatedly)
+                try:
+                    await init_rls_policies()
+                    logger.info("RLS policies initialized/verified")
+                except Exception as rls_error:
+                    logger.warning(f"RLS policy initialization skipped/failed: {rls_error}")
                 break
             except Exception as e:
                 if attempt < max_retries - 1:
