@@ -10,6 +10,7 @@ COPY *.py ./
 COPY app/ ./app/
 COPY start.sh ./
 COPY start_minimal.sh ./
+COPY start_debug.sh ./
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip
@@ -22,7 +23,7 @@ ENV PORT=8000
 EXPOSE $PORT
 
 # Make start scripts executable
-RUN chmod +x start.sh start_minimal.sh
+RUN chmod +x start.sh start_minimal.sh start_debug.sh
 
-# Start the minimal server for testing
-CMD ["./start_minimal.sh"]
+# Start the debug server for testing
+CMD ["./start_debug.sh"]
