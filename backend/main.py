@@ -113,8 +113,8 @@ app.add_middleware(
 # Security middleware
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS)
 
-# Custom middleware
-app.middleware("http")(log_requests)
+# Custom middleware - temporarily disabled due to health check issues
+# app.middleware("http")(log_requests)
 
 # Health check endpoint
 @app.get("/health", tags=["Health"])
