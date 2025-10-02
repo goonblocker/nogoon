@@ -120,7 +120,7 @@ const Popup = () => {
 
   // Load stats when stats screen is opened
   useEffect(() => {
-    if (currentScreen === 'stats' && authenticated && !userStats && !statsLoading) {
+    if (currentScreen === 'stats' && authenticated && !statsLoading) {
       fetchUserStats();
     }
   }, [currentScreen, authenticated]);
@@ -589,7 +589,10 @@ const Popup = () => {
                 variant="ghost"
                 size="icon"
                 className="rounded-full w-8 h-8"
-                onClick={fetchUserStats}
+                onClick={() => {
+                  setUserStats(null); // Clear existing data
+                  fetchUserStats(); // Fetch fresh data
+                }}
                 disabled={statsLoading}>
                 <RefreshCw className={`w-4 h-4 ${statsLoading ? 'animate-spin' : ''}`} />
               </Button>
@@ -668,7 +671,7 @@ const Popup = () => {
             </div>
           )}
 
-          {/* Statistics Content */}
+          {/* Statistics Content - Backend Data */}
           {!statsLoading && !statsError && userStats && (
             <>
               {/* Total Summary */}
@@ -745,9 +748,17 @@ const Popup = () => {
             </>
           )}
 
-          {/* Fallback to Local Data */}
+          {/* Loading State */}
+          {statsLoading && (
+            <div className="flex flex-col items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
+              <p className="text-sm font-bold tracking-tighter text-muted-foreground">Loading your statistics...</p>
+            </div>
+          )}
+
+          {/* No Data State - Show local data as fallback */}
           {!statsLoading && !statsError && !userStats && (
-            <>
+            <div className="text-center py-8">
               <div className="bg-gradient-to-br from-secondary to-primary rounded-2xl p-4 shadow-lg mb-3 text-primary-foreground">
                 <div className="flex items-center gap-2 mb-2">
                   <TrendingUp className="w-5 h-5" />
@@ -769,7 +780,9 @@ const Popup = () => {
                   <CheckCircle2 className="w-6 h-6 text-primary" />
                 </div>
               </div>
-            </>
+
+              <p className="text-xs text-muted-foreground mb-4">Sync your data to see full analytics</p>
+            </div>
           )}
 
           {/* Action Buttons */}
@@ -796,7 +809,8 @@ const Popup = () => {
                       console.log('[Popup] Real events synced:', response);
 
                       // Refresh stats
-                      await fetchUserStats();
+                      setUserStats(null); // Clear existing data
+                      await fetchUserStats(); // Fetch fresh data
                       alert(`Synced ${events.length} real blocked sites! Your analytics have been updated.`);
                     } else {
                       // No real data to sync
