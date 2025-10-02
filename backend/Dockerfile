@@ -21,5 +21,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Make start scripts executable
 RUN chmod +x start.sh start_minimal.sh start_debug.sh
 
-# Start minimal test server to debug Railway
-CMD ["python3", "minimal_health_test.py"]
+# Start the actual FastAPI application
+CMD ["sh", "-c", "python3 -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
