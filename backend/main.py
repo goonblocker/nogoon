@@ -168,6 +168,12 @@ async def health_check():
         }
 
 
+# Test endpoint
+@app.get("/test-migration")
+async def test_migration():
+    """Test endpoint to check if new deployment is working"""
+    return {"status": "success", "message": "New deployment is working"}
+
 # Migration endpoint
 @app.post("/migrate-database")
 async def migrate_database():
