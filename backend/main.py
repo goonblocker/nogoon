@@ -167,6 +167,71 @@ async def health_check():
             "database": "unknown"
         }
 
+
+# Migration endpoint
+@app.post("/migrate-database")
+async def migrate_database():
+    """Run database migration to simplify schema"""
+    try:
+        if not settings.DATABASE_URL:
+            return {"status": "error", "message": "No database URL configured"}
+        
+        from sqlalchemy import text
+        
+        async with engine.begin() as conn:
+            # Drop subscription columns
+            await conn.execute(text('''
+                ALTER TABLE users 
+                DROP COLUMN IF EXISTS is_premium,
+                DROP COLUMN IF EXISTS subscription_status,
+                DROP COLUMN IF EXISTS subscription_start_date,
+                DROP COLUMN IF EXISTS subscription_end_date,
+                DROP COLUMN IF EXISTS free_blocks_remaining,
+                DROP COLUMN IF EXISTS last_free_blocks_reset_date,
+                DROP COLUMN IF EXISTS preferred_payment_method;
+            '''))
+            
+            # Drop payment table
+            await conn.execute(text('DROP TABLE IF EXISTS payments CASCADE;'))
+            
+            # Simplify blocks_usage
+            await conn.execute(text('ALTER TABLE blocks_usage DROP COLUMN IF EXISTS is_premium_block;'))
+            
+            # Update indexes
+            await conn.execute(text('''
+                DROP INDEX IF EXISTS idx_user_subscription;
+                DROP INDEX IF EXISTS idx_payment_user_status;
+                DROP INDEX IF EXISTS idx_payment_date;
+                CREATE INDEX IF NOT EXISTS idx_user_blocks ON users (user_id, total_blocks_used);
+                CREATE INDEX IF NOT EXISTS idx_usage_domain ON blocks_usage (domain);
+                CREATE INDEX IF NOT EXISTS idx_usage_user_domain ON blocks_usage (user_id, domain);
+            '''))
+            
+            # Update data
+            await conn.execute(text('''
+                UPDATE users 
+                SET total_blocks_used = COALESCE((
+                    SELECT SUM(blocks_used) 
+                    FROM blocks_usage 
+                    WHERE blocks_usage.user_id = users.user_id
+                ), 0);
+            '''))
+            
+            await conn.commit()
+            
+            return {
+                "status": "success", 
+                "message": "Database migration completed successfully"
+            }
+                
+    except Exception as e:
+        logger.error(f"Migration failed: {e}")
+        return {
+            "status": "error", 
+            "message": f"Migration failed: {str(e)}"
+        }
+
+
 # Include routers
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
