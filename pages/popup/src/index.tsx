@@ -19,12 +19,14 @@ function init() {
           accentColor: '#676FFF',
         },
         embeddedWallets: {
-          ethereum: {
-            createOnLogin: 'users-without-wallets',
-          },
-          solana: {
-            createOnLogin: 'users-without-wallets',
-          },
+          createOnLogin: 'all-users',
+          requireUserPasswordOnCreate: false,
+          noPromptOnSignature: false,
+        },
+        loginMethods: ['email', 'sms'],
+        // Chrome extension specific configuration
+        _render: {
+          inParentWindow: true,
         },
       }}>
       <Popup />

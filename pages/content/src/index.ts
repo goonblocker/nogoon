@@ -22,9 +22,11 @@ chrome.storage.local.onChanged.addListener((changes: { [key: string]: chrome.sto
       isEnabled = newState.protectionActive;
       console.log('[Content Script] Protection state changed:', oldEnabled, '->', isEnabled);
 
-      // If protection was just disabled, unwrap all images and remove overlays
+      // If protection was just disabled, stop observer and unwrap all images
       if (oldEnabled && !isEnabled) {
-        console.log('[Content Script] Disabling protection, unwrapping all images...');
+        console.log('[Content Script] Disabling protection, stopping observer and unwrapping all images...');
+        stopObserver();
+
         document.querySelectorAll('.content-blocker-container').forEach(container => {
           const img = container.querySelector('img');
           if (img) {
@@ -36,9 +38,11 @@ chrome.storage.local.onChanged.addListener((changes: { [key: string]: chrome.sto
         });
       }
 
-      // If protection was just enabled, reprocess all images
+      // If protection was just enabled, start observer and reprocess all images
       if (!oldEnabled && isEnabled) {
-        console.log('[Content Script] Re-enabling protection, processing all images...');
+        console.log('[Content Script] Re-enabling protection, starting observer and processing all images...');
+        startObserver();
+
         // Force reprocess by clearing processed state for all existing wrapped images
         document.querySelectorAll('.content-blocker-container img').forEach(img => {
           processedImages.delete(img as HTMLImageElement);
@@ -290,13 +294,8 @@ async function processImage(img: HTMLImageElement) {
     return;
   }
 
-  // PAYWALL CHECK: Don't scan if user is out of free blocks and not premium
-  const canBlock = await privyAuthStorage.canBlock();
-  if (!canBlock) {
-    console.log('[Content Script] User out of free blocks, skipping image processing:', img.src);
-    processedImages.add(img); // Mark as processed so we don't keep trying
-    return;
-  }
+  // $NoGoon MODEL: No paywall, always free, powered by token trading fees
+  console.log('[Content Script] Processing image - powered by $NoGoon trading volume');
 
   processedImages.add(img);
   console.log('[AIDEBUGLOGDETECTIVEWORK]: Added image to processedImages:', img.src);
@@ -378,9 +377,8 @@ async function processImage(img: HTMLImageElement) {
       console.log('[AIDEBUGLOGDETECTIVEWORK]: Image disallowed, setting overlay text for:', img.src);
       console.log('[Content Script] Image disallowed:', img.src);
 
-      // User can block - decrement their free blocks count
-      const remaining = await privyAuthStorage.decrementFreeBlocks();
-      console.log('[Content Script] Free blocks remaining:', remaining);
+      // $NoGoon MODEL: No block limits, powered by token trading fees
+      console.log('[Content Script] Block successful - powered by $NoGoon community');
 
       // Increment block count in storage
       contentBlockingStorage.incrementBlockCount().catch(err => {
@@ -439,101 +437,135 @@ async function processImage(img: HTMLImageElement) {
 }
 
 // --- Mutation Observer ---
-const observer = new MutationObserver(mutations => {
-  // console.log('[AIDEBUGLOGDETECTIVEWORK]: MutationObserver triggered.'); // This can be very noisy
-  if (!isEnabled) return;
+let observer: MutationObserver | null = null;
 
-  mutations.forEach(mutation => {
-    // Handle added nodes
-    mutation.addedNodes.forEach(node => {
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        const element = node as Element;
-        // Process new IMG tags directly
-        if (element.tagName === 'IMG') {
-          // console.log('[AIDEBUGLOGDETECTIVEWORK]: New IMG detected directly:', (element as HTMLImageElement).src);
-          processImage(element as HTMLImageElement);
-        }
-        // Process IMG tags within added subtrees
-        element.querySelectorAll('img').forEach(img => {
-          // console.log('[AIDEBUGLOGDETECTIVEWORK]: New IMG detected in subtree:', img.src);
-          processImage(img);
-        });
-        // Look for background images (basic check)
-        if (element instanceof HTMLElement) {
-          const style = window.getComputedStyle(element);
-          if (style.backgroundImage && style.backgroundImage !== 'none') {
-            // TODO: Extract URL from background-image and process if it's an image
-            // This is more complex due to multiple backgrounds, gradients etc.
-            // console.log('Found background image on:', element);
+function createObserver() {
+  return new MutationObserver(mutations => {
+    // console.log('[AIDEBUGLOGDETECTIVEWORK]: MutationObserver triggered.'); // This can be very noisy
+    if (!isEnabled) return;
+
+    mutations.forEach(mutation => {
+      // Handle added nodes
+      mutation.addedNodes.forEach(node => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const element = node as Element;
+          // Process new IMG tags directly
+          if (element.tagName === 'IMG') {
+            // console.log('[AIDEBUGLOGDETECTIVEWORK]: New IMG detected directly:', (element as HTMLImageElement).src);
+            processImage(element as HTMLImageElement);
           }
+          // Process IMG tags within added subtrees
+          element.querySelectorAll('img').forEach(img => {
+            // console.log('[AIDEBUGLOGDETECTIVEWORK]: New IMG detected in subtree:', img.src);
+            processImage(img);
+          });
+          // Look for background images (basic check)
+          if (element instanceof HTMLElement) {
+            const style = window.getComputedStyle(element);
+            if (style.backgroundImage && style.backgroundImage !== 'none') {
+              // TODO: Extract URL from background-image and process if it's an image
+              // This is more complex due to multiple backgrounds, gradients etc.
+              // console.log('Found background image on:', element);
+            }
+          }
+        }
+      });
+
+      // Handle src attribute changes on existing IMG tags
+      if (
+        mutation.type === 'attributes' &&
+        (mutation.attributeName === 'src' || mutation.attributeName === 'srcset') &&
+        mutation.target.nodeName === 'IMG'
+      ) {
+        const img = mutation.target as HTMLImageElement;
+        console.log(
+          '[AIDEBUGLOGDETECTIVEWORK]: Attribute changed on IMG:',
+          mutation.attributeName,
+          'New src:',
+          img.src,
+        );
+        // If src changes, remove from processed set and re-evaluate
+        // Check if it's currently wrapped
+        const wrapper = img.closest('.content-blocker-container');
+        if (wrapper) {
+          console.log('[Content Script] Src changed on wrapped image, unwrapping:', img.src);
+          unwrapImage(img, wrapper as HTMLElement);
+        }
+        processedImages.delete(img);
+        // Reprocess after a short delay to allow attributes to settle
+        console.log('[AIDEBUGLOGDETECTIVEWORK]: Scheduling reprocess for src change:', img.src);
+        setTimeout(() => processImage(img), 50);
+      }
+      // Handle style changes that might add a background image
+      if (
+        mutation.type === 'attributes' &&
+        mutation.attributeName === 'style' &&
+        mutation.target instanceof HTMLElement
+      ) {
+        const element = mutation.target as HTMLElement;
+        const style = window.getComputedStyle(element);
+        if (style.backgroundImage && style.backgroundImage !== 'none') {
+          // TODO: Extract URL and process if new/changed and an image
+          // console.log('Found potential background image change on:', element);
         }
       }
     });
-
-    // Handle src attribute changes on existing IMG tags
-    if (
-      mutation.type === 'attributes' &&
-      (mutation.attributeName === 'src' || mutation.attributeName === 'srcset') &&
-      mutation.target.nodeName === 'IMG'
-    ) {
-      const img = mutation.target as HTMLImageElement;
-      console.log('[AIDEBUGLOGDETECTIVEWORK]: Attribute changed on IMG:', mutation.attributeName, 'New src:', img.src);
-      // If src changes, remove from processed set and re-evaluate
-      // Check if it's currently wrapped
-      const wrapper = img.closest('.content-blocker-container');
-      if (wrapper) {
-        console.log('[Content Script] Src changed on wrapped image, unwrapping:', img.src);
-        unwrapImage(img, wrapper as HTMLElement);
-      }
-      processedImages.delete(img);
-      // Reprocess after a short delay to allow attributes to settle
-      console.log('[AIDEBUGLOGDETECTIVEWORK]: Scheduling reprocess for src change:', img.src);
-      setTimeout(() => processImage(img), 50);
-    }
-    // Handle style changes that might add a background image
-    if (
-      mutation.type === 'attributes' &&
-      mutation.attributeName === 'style' &&
-      mutation.target instanceof HTMLElement
-    ) {
-      const element = mutation.target as HTMLElement;
-      const style = window.getComputedStyle(element);
-      if (style.backgroundImage && style.backgroundImage !== 'none') {
-        // TODO: Extract URL and process if new/changed and an image
-        // console.log('Found potential background image change on:', element);
-      }
-    }
   });
-});
+}
+
+function startObserver() {
+  if (!observer && isEnabled) {
+    console.log('[Content Script] Starting MutationObserver...');
+    observer = createObserver();
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['src', 'srcset', 'style'], // Observe src, srcset, and style changes
+    });
+    console.log('[Content Script] Observer started.');
+  }
+}
+
+function stopObserver() {
+  if (observer) {
+    console.log('[Content Script] Stopping MutationObserver...');
+    observer.disconnect();
+    observer = null;
+    console.log('[Content Script] Observer stopped.');
+  }
+}
 
 // --- Initialization ---
 function initializeContentScript() {
-  console.log('[Content Script] Initializing observer...');
-  console.log('[AIDEBUGLOGDETECTIVEWORK]: Initializing MutationObserver.');
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['src', 'srcset', 'style'], // Observe src, srcset, and style changes
-  });
+  console.log('[Content Script] Initializing content script...');
+  console.log('[AIDEBUGLOGDETECTIVEWORK]: Initializing content script.');
 
-  // Process images already present on the page
-  console.log('[AIDEBUGLOGDETECTIVEWORK]: Processing initially present images.');
-  document.querySelectorAll('img').forEach(img => {
-    processImage(img);
-  });
-  // Process initial background images (basic)
-  document.querySelectorAll('*').forEach(element => {
-    if (element instanceof HTMLElement) {
-      const style = window.getComputedStyle(element);
-      if (style.backgroundImage && style.backgroundImage !== 'none') {
-        // TODO: Extract URL and process
-        // console.log('Found initial background image on:', element);
+  // Only start processing if protection is enabled
+  if (isEnabled) {
+    console.log('[Content Script] Protection is enabled, starting observer and processing images...');
+    startObserver();
+
+    // Process images already present on the page
+    console.log('[AIDEBUGLOGDETECTIVEWORK]: Processing initially present images.');
+    document.querySelectorAll('img').forEach(img => {
+      processImage(img);
+    });
+    // Process initial background images (basic)
+    document.querySelectorAll('*').forEach(element => {
+      if (element instanceof HTMLElement) {
+        const style = window.getComputedStyle(element);
+        if (style.backgroundImage && style.backgroundImage !== 'none') {
+          // TODO: Extract URL and process
+          // console.log('Found initial background image on:', element);
+        }
       }
-    }
-  });
+    });
+  } else {
+    console.log('[Content Script] Protection is disabled, skipping image processing.');
+  }
 
-  console.log('[Content Script] Observer initialized.');
+  console.log('[Content Script] Initialization complete.');
 }
 
 // Wait for DOM ready before initializing
