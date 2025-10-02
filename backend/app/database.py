@@ -19,13 +19,7 @@ if settings.DATABASE_URL and not settings.DATABASE_URL.startswith("sqlite"):
     if db_url.startswith("postgresql://"):
         db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
     
-    # Add connection parameters for Railway PostgreSQL
-    if "railway" in db_url:
-        # For asyncpg, we need to use ssl=require instead of sslmode=require
-        if "?" not in db_url:
-            db_url += "?ssl=require"
-        else:
-            db_url += "&ssl=require"
+    # Railway PostgreSQL handles SSL automatically, no need for additional parameters
     
     engine = create_async_engine(
         db_url,
