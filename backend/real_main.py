@@ -243,6 +243,85 @@ async def health_check():
         "timestamp": datetime.utcnow().isoformat()
     }
 
+@app.post("/admin/migrate-database")
+async def migrate_database():
+    """Migrate database schema to current version"""
+    if not settings.DATABASE_URL:
+        raise HTTPException(status_code=500, detail="No database configured")
+    
+    try:
+        async with engine.begin() as conn:
+            logger.info("Starting database migration...")
+            
+            # Check existing tables
+            result = await conn.execute(text("""
+                SELECT table_name FROM information_schema.tables 
+                WHERE table_schema = 'public' ORDER BY table_name;
+            """))
+            existing_tables = [row[0] for row in result.fetchall()]
+            
+            # Drop old tables
+            old_tables = ['payments', 'subscriptions', 'payment_methods']
+            for table in old_tables:
+                if table in existing_tables:
+                    await conn.execute(text(f"DROP TABLE IF EXISTS {table} CASCADE;"))
+            
+            # Recreate users table if it has old columns
+            if 'users' in existing_tables:
+                result = await conn.execute(text("""
+                    SELECT column_name FROM information_schema.columns 
+                    WHERE table_name = 'users' AND table_schema = 'public';
+                """))
+                user_columns = [row[0] for row in result.fetchall()]
+                old_columns = ['is_premium', 'subscription_status', 'preferred_payment_method']
+                
+                if any(col in user_columns for col in old_columns):
+                    await conn.execute(text("DROP TABLE IF EXISTS users CASCADE;"))
+            
+            # Drop and recreate blocks_usage
+            await conn.execute(text("DROP TABLE IF EXISTS blocks_usage CASCADE;"))
+            
+            # Create users table
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    user_id VARCHAR(255) NOT NULL UNIQUE,
+                    email VARCHAR(255),
+                    wallet_address VARCHAR(255),
+                    total_blocks_used INTEGER NOT NULL DEFAULT 0,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                    last_login TIMESTAMP WITH TIME ZONE
+                );
+            """))
+            
+            # Create blocks_usage table
+            await conn.execute(text("""
+                CREATE TABLE blocks_usage (
+                    id SERIAL PRIMARY KEY,
+                    user_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+                    blocks_used INTEGER NOT NULL DEFAULT 1,
+                    domain VARCHAR(255),
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+                );
+            """))
+            
+            # Create indexes
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_users_user_id ON users(user_id);"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_blocks_usage_user_id ON blocks_usage(user_id);"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_usage_user_date ON blocks_usage(user_id, created_at);"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_usage_domain ON blocks_usage(domain);"))
+            
+            return {
+                "status": "success",
+                "message": "Database migration completed successfully",
+                "tables_created": ["users", "blocks_usage"]
+            }
+            
+    except Exception as e:
+        logger.error(f"Migration failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
+
 @app.get("/api/v1/users/stats", response_model=AnalyticsResponse)
 async def get_user_stats(
     user: User = Depends(get_current_user),
