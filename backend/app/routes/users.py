@@ -87,6 +87,18 @@ async def get_user_stats(
 ):
     """Get user usage statistics"""
     try:
+        # Check if database is available
+        if not settings.DATABASE_URL:
+            # Return mock data if no database
+            from app.schemas import UsageStats
+            mock_stats = UsageStats(
+                total_blocks_used=0,
+                blocks_used_today=0,
+                blocks_used_this_week=0,
+                blocks_used_this_month=0,
+                most_blocked_domains=[]
+            )
+            return AnalyticsResponse(stats=mock_stats)
         now = datetime.utcnow()
         today_start = datetime(now.year, now.month, now.day)
         week_start = now - timedelta(days=7)

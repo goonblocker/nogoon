@@ -29,6 +29,16 @@ async def login(
     Creates user if doesn't exist, updates if exists
     """
     try:
+        # Check if database is available
+        if not settings.DATABASE_URL:
+            # Return mock response if no database
+            return AuthResponse(
+                user_id="mock_user",
+                is_premium=False,
+                free_blocks_remaining=10,
+                subscription_status="free",
+                message="Authentication successful (mock mode - no database)"
+            )
         # Verify Privy token
         claims = await privy_auth.verify_token(request.access_token)
         user_data = privy_auth.extract_user_data(claims)

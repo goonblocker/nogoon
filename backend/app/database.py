@@ -6,6 +6,7 @@ from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import text
 from app.config import settings
 import logging
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +23,16 @@ if settings.DATABASE_URL and not settings.DATABASE_URL.startswith("sqlite"):
         db_url,
         echo=settings.ENVIRONMENT == "development",
         pool_pre_ping=True,
-        pool_size=10,
-        max_overflow=20
+        pool_size=5,  # Reduced pool size for Railway
+        max_overflow=10,  # Reduced overflow for Railway
+        pool_recycle=3600,  # Recycle connections every hour
+        pool_timeout=30,  # Timeout for getting connection from pool
+        connect_args={
+            "command_timeout": 60,  # Command timeout
+            "server_settings": {
+                "application_name": "nogoon_backend",
+            }
+        }
     )
     logger.info(f"Using PostgreSQL database with asyncpg")
 else:
@@ -51,16 +60,31 @@ class Base(DeclarativeBase):
 
 
 async def get_db() -> AsyncSession:
-    """Dependency to get database session"""
-    async with AsyncSessionLocal() as session:
+    """Dependency to get database session with retry logic"""
+    max_retries = 3
+    retry_delay = 1
+    
+    for attempt in range(max_retries):
         try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
+            async with AsyncSessionLocal() as session:
+                try:
+                    yield session
+                    await session.commit()
+                except Exception as e:
+                    logger.error(f"Database operation failed (attempt {attempt + 1}): {e}")
+                    await session.rollback()
+                    raise
+                finally:
+                    await session.close()
+                return  # Success, exit retry loop
+        except Exception as e:
+            if attempt < max_retries - 1:
+                logger.warning(f"Database connection failed (attempt {attempt + 1}), retrying in {retry_delay}s: {e}")
+                await asyncio.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                logger.error(f"Database connection failed after {max_retries} attempts: {e}")
+                raise
 
 
 async def init_rls_policies():

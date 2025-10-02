@@ -87,18 +87,34 @@ app.middleware("http")(log_requests)
 # Health check endpoint
 @app.get("/health", tags=["Health"])
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint with database connectivity test"""
     try:
+        # Test database connection
+        db_status = "unknown"
+        if settings.DATABASE_URL:
+            try:
+                from sqlalchemy import text
+                async with engine.connect() as conn:
+                    await conn.execute(text("SELECT 1"))
+                    db_status = "connected"
+            except Exception as db_error:
+                db_status = f"error: {str(db_error)[:100]}"
+        else:
+            db_status = "no_database_url"
+        
         return {
             "status": "healthy",
             "environment": settings.ENVIRONMENT,
-            "version": "1.0.0"
+            "version": "1.0.0",
+            "database": db_status,
+            "privy_app_id": settings.PRIVY_APP_ID
         }
     except Exception as e:
         return {
             "status": "unhealthy", 
             "error": str(e),
-            "version": "1.0.0"
+            "version": "1.0.0",
+            "database": "unknown"
         }
 
 # Include routers
