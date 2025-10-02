@@ -136,8 +136,9 @@ async def init_rls_policies():
 
 async def set_current_user(session: AsyncSession, user_id: str):
     """Set current user context for RLS"""
+    # Use set_config because SET cannot be parameterized with bind variables
     await session.execute(
-        text("SET LOCAL app.current_user_id = :user_id"),
+        text("SELECT set_config('app.current_user_id', :user_id, true)"),
         {"user_id": user_id}
     )
 
