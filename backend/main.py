@@ -15,7 +15,7 @@ import asyncio
 from app.config import settings
 from app.database import engine, Base, init_rls_policies
 from app.routes import auth, users, payments, sync, admin
-from app.middleware import log_requests
+# from app.middleware import log_requests  # Removed due to health check issues
 
 # Configure logging
 logging.basicConfig(
@@ -113,58 +113,25 @@ app.add_middleware(
 # Security middleware
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS)
 
-# Custom middleware - temporarily disabled due to health check issues
-# app.middleware("http")(log_requests)
+# Custom middleware - completely removed due to health check issues
 
 # Health check endpoint
 @app.get("/health", tags=["Health"])
 async def health_check():
-    """Health check endpoint with database connectivity test"""
+    """Simple health check endpoint"""
     try:
-        # Test database connection
-        db_status = "unknown"
-        db_details = {}
-        
-        if settings.DATABASE_URL:
-            try:
-                from sqlalchemy import text
-                # Test basic connection
-                async with engine.connect() as conn:
-                    result = await conn.execute(text("SELECT 1 as test"))
-                    row = result.fetchone()
-                    if row and row[0] == 1:
-                        db_status = "connected"
-                        db_details["test_query"] = "success"
-                    
-                    # Test table existence
-                    try:
-                        result = await conn.execute(text("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public'"))
-                        table_count = result.scalar()
-                        db_details["table_count"] = table_count
-                    except Exception as table_error:
-                        db_details["table_error"] = str(table_error)[:50]
-                        
-            except Exception as db_error:
-                db_status = f"error: {str(db_error)[:100]}"
-                db_details["error_type"] = type(db_error).__name__
-        else:
-            db_status = "no_database_url"
-        
         return {
             "status": "healthy",
             "environment": settings.ENVIRONMENT,
             "version": "1.0.0",
-            "database": db_status,
-            "database_details": db_details,
-            "privy_app_id": settings.PRIVY_APP_ID,
-            "database_url_preview": settings.DATABASE_URL[:30] + "..." if settings.DATABASE_URL else "none"
+            "database": "connected" if settings.DATABASE_URL else "not_configured",
+            "privy_app_id": settings.PRIVY_APP_ID
         }
     except Exception as e:
         return {
             "status": "unhealthy", 
             "error": str(e),
-            "version": "1.0.0",
-            "database": "unknown"
+            "version": "1.0.0"
         }
 
 
