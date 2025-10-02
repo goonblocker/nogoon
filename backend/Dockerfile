@@ -21,5 +21,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Make start scripts executable
 RUN chmod +x start.sh start_minimal.sh start_debug.sh
 
-# Start simplified FastAPI app for Railway compatibility  
-CMD ["python3", "simple_main.py"]
+# Start real FastAPI app with database and authentication
+CMD ["python3", "real_main.py"]
