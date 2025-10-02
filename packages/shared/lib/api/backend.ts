@@ -308,6 +308,20 @@ export async function syncBlockEvents(
   );
 }
 
+export async function clearTestData(accessToken: string): Promise<{
+  status: string;
+  message: string;
+  records_deleted: number;
+}> {
+  return apiRequest(
+    '/api/v1/users/clear-test-data',
+    {
+      method: 'DELETE',
+    },
+    accessToken,
+  );
+}
+
 /**
  * Check if backend is available
  * Returns true if backend is reachable, false otherwise

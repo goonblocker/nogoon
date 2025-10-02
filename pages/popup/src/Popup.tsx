@@ -8,6 +8,7 @@ import {
   isBackendAvailable,
   getUserStats,
   syncBlockEvents,
+  clearTestData,
 } from '@extension/shared';
 import { exampleThemeStorage, contentBlockingStorage, privyAuthStorage } from '@extension/storage';
 import { useState, useEffect } from 'react';
@@ -803,50 +804,80 @@ const Popup = () => {
               Sync Real Data & Refresh
             </Button>
 
-            {/* Test Data Button - Only for development/testing */}
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full h-8 rounded-full text-xs font-bold tracking-tighter"
-              onClick={async () => {
-                // Add test data for demonstration purposes
-                try {
-                  if (authenticated && getAccessToken && backendAvailable) {
-                    const accessToken = await getAccessToken();
+            {/* Test Data Buttons - Only for development/testing */}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 h-8 rounded-full text-xs font-bold tracking-tighter"
+                onClick={async () => {
+                  // Add test data for demonstration purposes
+                  try {
+                    if (authenticated && getAccessToken && backendAvailable) {
+                      const accessToken = await getAccessToken();
 
-                    // Create test events to populate stats
-                    const testEvents = [
-                      {
-                        domain: 'example.com',
-                        count: 1,
-                      },
-                      {
-                        domain: 'test-site.com',
-                        count: 2,
-                      },
-                      {
-                        domain: 'demo.org',
-                        count: 1,
-                      },
-                    ];
+                      // Create test events to populate stats
+                      const testEvents = [
+                        {
+                          domain: 'example.com',
+                          count: 1,
+                        },
+                        {
+                          domain: 'test-site.com',
+                          count: 2,
+                        },
+                        {
+                          domain: 'demo.org',
+                          count: 1,
+                        },
+                      ];
 
-                    console.log('[Popup] Syncing test events to backend:', testEvents);
-                    const response = await syncBlockEvents(accessToken, testEvents);
-                    console.log('[Popup] Test events synced:', response);
+                      console.log('[Popup] Syncing test events to backend:', testEvents);
+                      const response = await syncBlockEvents(accessToken, testEvents);
+                      console.log('[Popup] Test events synced:', response);
 
-                    // Refresh stats
-                    await fetchUserStats();
-                    alert('Test data added! This is for demonstration purposes only.');
-                  } else {
-                    alert('Please authenticate first to sync data.');
+                      // Refresh stats
+                      await fetchUserStats();
+                      alert('Test data added! This is for demonstration purposes only.');
+                    } else {
+                      alert('Please authenticate first to sync data.');
+                    }
+                  } catch (error) {
+                    console.error('[Popup] Error syncing test data:', error);
+                    alert('Error syncing test data. Please try again.');
                   }
-                } catch (error) {
-                  console.error('[Popup] Error syncing test data:', error);
-                  alert('Error syncing test data. Please try again.');
-                }
-              }}>
-              Add Test Data (Demo)
-            </Button>
+                }}>
+                Add Test Data
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 h-8 rounded-full text-xs font-bold tracking-tighter border-red-200 text-red-600 hover:bg-red-50"
+                onClick={async () => {
+                  // Clear test data
+                  try {
+                    if (authenticated && getAccessToken && backendAvailable) {
+                      const accessToken = await getAccessToken();
+
+                      console.log('[Popup] Clearing test data...');
+                      const response = await clearTestData(accessToken);
+                      console.log('[Popup] Test data cleared:', response);
+
+                      // Refresh stats
+                      await fetchUserStats();
+                      alert(`Test data cleared! ${response.records_deleted} records removed.`);
+                    } else {
+                      alert('Please authenticate first to clear data.');
+                    }
+                  } catch (error) {
+                    console.error('[Popup] Error clearing test data:', error);
+                    alert('Error clearing test data. Please try again.');
+                  }
+                }}>
+                Clear Test Data
+              </Button>
+            </div>
           </div>
 
           <p className="text-center text-xs text-muted-foreground mt-3 font-bold tracking-tighter">

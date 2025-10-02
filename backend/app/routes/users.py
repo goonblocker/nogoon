@@ -186,10 +186,10 @@ async def sync_block_events(
                 "message": "Block events received (mock mode - no database)",
                 "events_processed": len(request.events)
             }
-        
+
         total_blocks = 0
         domains_processed = set()
-        
+
         # Process each block event
         for event in request.events:
             # Create or update block usage record
@@ -203,14 +203,14 @@ async def sync_block_events(
             db.add(block_usage)
             total_blocks += event.count
             domains_processed.add(event.domain)
-        
+
         # Update user's total blocks used
         user.total_blocks_used += total_blocks
-        
+
         await db.commit()
-        
+
         logger.info(f"Synced {len(request.events)} block events for user {user.user_id}, total blocks: {total_blocks}")
-        
+
         return {
             "status": "success",
             "message": "Block events synced successfully",
@@ -218,13 +218,76 @@ async def sync_block_events(
             "total_blocks_added": total_blocks,
             "domains_processed": list(domains_processed)
         }
-        
+
     except Exception as e:
         logger.error(f"Error syncing block events: {e}")
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to sync block events"
+        )
+
+
+@router.delete("/clear-test-data")
+async def clear_test_data(
+    user: User = Depends(get_auth_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Clear test data from user's statistics"""
+    try:
+        # Check if database is available
+        if not settings.DATABASE_URL:
+            return {
+                "status": "success",
+                "message": "Test data cleared (mock mode - no database)",
+                "records_deleted": 0
+            }
+
+        # Test domains to clear
+        test_domains = ['example.com', 'test-site.com', 'demo.org', 'test-domain.com']
+        
+        # Count test records before deletion
+        result = await db.execute(
+            select(func.count(BlocksUsage.id))
+            .where(
+                BlocksUsage.user_id == user.user_id,
+                BlocksUsage.domain.in_(test_domains)
+            )
+        )
+        test_count = result.scalar()
+        
+        if test_count > 0:
+            # Delete test records
+            await db.execute(
+                BlocksUsage.__table__.delete()
+                .where(
+                    BlocksUsage.user_id == user.user_id,
+                    BlocksUsage.domain.in_(test_domains)
+                )
+            )
+            
+            await db.commit()
+            
+            logger.info(f"Cleared {test_count} test records for user {user.user_id}")
+            
+            return {
+                "status": "success",
+                "message": f"Cleared {test_count} test records",
+                "records_deleted": test_count
+            }
+        else:
+            return {
+                "status": "success",
+                "message": "No test data found to clear",
+                "records_deleted": 0
+            }
+
+    except Exception as e:
+        logger.error(f"Error clearing test data: {e}")
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to clear test data"
         )
 
 
