@@ -2,12 +2,31 @@
 
 echo "Starting NoGoon Backend..."
 echo "Port: ${PORT:-8000}"
-echo "Environment variables:"
-env | grep -E "(PORT|DATABASE|PRIVY|SECRET)" || echo "No relevant env vars found"
+echo "Environment: ${ENVIRONMENT:-development}"
 
-echo "Testing import..."
-python -c "import main; print('Import successful')" || echo "Import failed"
+# Minimal environment check
+echo "Checking environment variables..."
+if [ -n "$DATABASE_URL" ]; then
+    echo "✓ DATABASE_URL is set"
+else
+    echo "⚠ DATABASE_URL not set (will use SQLite)"
+fi
 
-echo "Starting uvicorn..."
-echo "Using PORT: ${PORT:-8000}"
-exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --log-level info
+if [ -n "$PRIVY_APP_ID" ]; then
+    echo "✓ PRIVY_APP_ID is set"
+else
+    echo "⚠ PRIVY_APP_ID not set"
+fi
+
+echo "Starting uvicorn server..."
+echo "Host: 0.0.0.0"
+echo "Port: ${PORT:-8000}"
+echo "Log level: info"
+
+# Start the server with minimal configuration for Railway
+exec uvicorn main:app \
+    --host 0.0.0.0 \
+    --port ${PORT:-8000} \
+    --log-level info \
+    --access-log \
+    --no-use-colors
