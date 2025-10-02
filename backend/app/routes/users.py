@@ -3,7 +3,7 @@ User management routes
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 from datetime import datetime, timedelta
 
 from app.database import get_db, set_current_user
@@ -83,66 +83,56 @@ async def update_current_user(
 
 
 @router.post("/migrate-database")
-async def migrate_database():
+async def migrate_database(db: AsyncSession = Depends(get_db)):
     """Run database migration to simplify schema"""
     try:
         if not settings.DATABASE_URL:
             return {"status": "error", "message": "No database URL configured"}
         
-        conn = await asyncpg.connect(settings.DATABASE_URL)
+        # Use SQLAlchemy to run the migration
+        await db.execute(text('''
+            ALTER TABLE users 
+            DROP COLUMN IF EXISTS is_premium,
+            DROP COLUMN IF EXISTS subscription_status,
+            DROP COLUMN IF EXISTS subscription_start_date,
+            DROP COLUMN IF EXISTS subscription_end_date,
+            DROP COLUMN IF EXISTS free_blocks_remaining,
+            DROP COLUMN IF EXISTS last_free_blocks_reset_date,
+            DROP COLUMN IF EXISTS preferred_payment_method;
+        '''))
         
-        try:
-            # Drop subscription columns
-            await conn.execute('''
-                ALTER TABLE users 
-                DROP COLUMN IF EXISTS is_premium,
-                DROP COLUMN IF EXISTS subscription_status,
-                DROP COLUMN IF EXISTS subscription_start_date,
-                DROP COLUMN IF EXISTS subscription_end_date,
-                DROP COLUMN IF EXISTS free_blocks_remaining,
-                DROP COLUMN IF EXISTS last_free_blocks_reset_date,
-                DROP COLUMN IF EXISTS preferred_payment_method;
-            ''')
-            
-            # Drop payment table
-            await conn.execute('DROP TABLE IF EXISTS payments CASCADE;')
-            
-            # Simplify blocks_usage
-            await conn.execute('ALTER TABLE blocks_usage DROP COLUMN IF EXISTS is_premium_block;')
-            
-            # Update indexes
-            await conn.execute('''
-                DROP INDEX IF EXISTS idx_user_subscription;
-                DROP INDEX IF EXISTS idx_payment_user_status;
-                DROP INDEX IF EXISTS idx_payment_date;
-                CREATE INDEX IF NOT EXISTS idx_user_blocks ON users (user_id, total_blocks_used);
-                CREATE INDEX IF NOT EXISTS idx_usage_domain ON blocks_usage (domain);
-                CREATE INDEX IF NOT EXISTS idx_usage_user_domain ON blocks_usage (user_id, domain);
-            ''')
-            
-            # Update data
-            await conn.execute('''
-                UPDATE users 
-                SET total_blocks_used = COALESCE((
-                    SELECT SUM(blocks_used) 
-                    FROM blocks_usage 
-                    WHERE blocks_usage.user_id = users.user_id
-                ), 0);
-            ''')
-            
-            await conn.close()
-            
-            return {
-                "status": "success", 
-                "message": "Database migration completed successfully"
-            }
-            
-        except Exception as e:
-            await conn.close()
-            raise e
+        await db.execute(text('DROP TABLE IF EXISTS payments CASCADE;'))
+        
+        await db.execute(text('ALTER TABLE blocks_usage DROP COLUMN IF EXISTS is_premium_block;'))
+        
+        await db.execute(text('''
+            DROP INDEX IF EXISTS idx_user_subscription;
+            DROP INDEX IF EXISTS idx_payment_user_status;
+            DROP INDEX IF EXISTS idx_payment_date;
+            CREATE INDEX IF NOT EXISTS idx_user_blocks ON users (user_id, total_blocks_used);
+            CREATE INDEX IF NOT EXISTS idx_usage_domain ON blocks_usage (domain);
+            CREATE INDEX IF NOT EXISTS idx_usage_user_domain ON blocks_usage (user_id, domain);
+        '''))
+        
+        await db.execute(text('''
+            UPDATE users 
+            SET total_blocks_used = COALESCE((
+                SELECT SUM(blocks_used) 
+                FROM blocks_usage 
+                WHERE blocks_usage.user_id = users.user_id
+            ), 0);
+        '''))
+        
+        await db.commit()
+        
+        return {
+            "status": "success", 
+            "message": "Database migration completed successfully"
+        }
             
     except Exception as e:
         logger.error(f"Migration failed: {e}")
+        await db.rollback()
         return {
             "status": "error", 
             "message": f"Migration failed: {str(e)}"
