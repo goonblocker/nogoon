@@ -10,6 +10,7 @@ from app.database import get_db, set_current_user
 from app.models import User, BlocksUsage
 from app.schemas import UserResponse, UserUpdate, UsageStats, AnalyticsResponse
 from app.privy_auth import get_current_user
+from app.config import settings
 import logging
 
 logger = logging.getLogger(__name__)
