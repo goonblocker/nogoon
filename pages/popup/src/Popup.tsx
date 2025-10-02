@@ -159,13 +159,11 @@ const Popup = () => {
             count: 1,
           });
         }
+        console.log('[Popup] Syncing real blocked sites:', events);
       } else {
-        // If no blocked sites, create a test event to populate stats
-        console.log('[Popup] No blocked sites found, creating test event');
-        events.push({
-          domain: 'test-domain.com',
-          count: 1,
-        });
+        // If no blocked sites, don't send test data automatically
+        console.log('[Popup] No blocked sites found, skipping sync to avoid test data spam');
+        return;
       }
 
       if (events.length > 0) {
@@ -762,13 +760,56 @@ const Popup = () => {
             </>
           )}
 
-          {/* Action Button */}
-          <div className="mt-auto">
+          {/* Action Buttons */}
+          <div className="mt-auto space-y-2">
             <Button
               size="lg"
               className="w-full h-10 rounded-full text-sm font-black tracking-tighter shadow-lg"
               onClick={async () => {
-                // Force sync test data to backend and refresh stats
+                // Sync real data or show message about no data
+                try {
+                  if (authenticated && getAccessToken && backendAvailable) {
+                    const accessToken = await getAccessToken();
+
+                    // Check if we have real blocked sites
+                    if (blockingState.blockedSites && blockingState.blockedSites.length > 0) {
+                      // Sync real blocked sites
+                      const events = blockingState.blockedSites.map(site => ({
+                        domain: site,
+                        count: 1,
+                      }));
+
+                      console.log('[Popup] Syncing real blocked sites:', events);
+                      const response = await syncBlockEvents(accessToken, events);
+                      console.log('[Popup] Real events synced:', response);
+
+                      // Refresh stats
+                      await fetchUserStats();
+                      alert(`Synced ${events.length} real blocked sites! Your analytics have been updated.`);
+                    } else {
+                      // No real data to sync
+                      alert(
+                        'No blocked sites found to sync. Try visiting some websites while the extension is active to generate real data.',
+                      );
+                    }
+                  } else {
+                    alert('Please authenticate first to sync data.');
+                  }
+                } catch (error) {
+                  console.error('[Popup] Error syncing data:', error);
+                  alert('Error syncing data. Please try again.');
+                }
+              }}>
+              Sync Real Data & Refresh
+            </Button>
+
+            {/* Test Data Button - Only for development/testing */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full h-8 rounded-full text-xs font-bold tracking-tighter"
+              onClick={async () => {
+                // Add test data for demonstration purposes
                 try {
                   if (authenticated && getAccessToken && backendAvailable) {
                     const accessToken = await getAccessToken();
@@ -795,16 +836,16 @@ const Popup = () => {
 
                     // Refresh stats
                     await fetchUserStats();
-                    alert('Test data synced! Your analytics have been updated with sample data.');
+                    alert('Test data added! This is for demonstration purposes only.');
                   } else {
                     alert('Please authenticate first to sync data.');
                   }
                 } catch (error) {
                   console.error('[Popup] Error syncing test data:', error);
-                  alert('Error syncing data. Please try again.');
+                  alert('Error syncing test data. Please try again.');
                 }
               }}>
-              Sync Test Data & Refresh
+              Add Test Data (Demo)
             </Button>
           </div>
 
