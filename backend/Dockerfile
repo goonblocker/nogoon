@@ -25,5 +25,5 @@ EXPOSE $PORT
 # Make start scripts executable
 RUN chmod +x start.sh start_minimal.sh start_debug.sh
 
-# Start the FastAPI server
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Start the FastAPI server using the startup script
+CMD ["./start.sh"]

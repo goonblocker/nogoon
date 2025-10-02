@@ -3,6 +3,9 @@
 echo "Starting NoGoon Backend..."
 echo "Port: ${PORT:-8000}"
 echo "Environment: ${ENVIRONMENT:-development}"
+echo "Python version: $(python3 --version)"
+echo "Current directory: $(pwd)"
+echo "Files in directory: $(ls -la | wc -l) files"
 
 # Minimal environment check
 echo "Checking environment variables..."
@@ -19,13 +22,13 @@ else
 fi
 
 echo "Starting uvicorn server..."
-echo "Host: :: (IPv6 - Railway v2 requirement)"
+echo "Host: 0.0.0.0"
 echo "Port: ${PORT:-8000}"
 echo "Log level: info"
 
-# Start the server with IPv6 support for Railway v2
+# Start the server
 exec uvicorn main:app \
-    --host :: \
+    --host 0.0.0.0 \
     --port ${PORT:-8000} \
     --log-level info \
     --access-log \
