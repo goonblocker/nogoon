@@ -47,6 +47,16 @@ async def lifespan(app: FastAPI):
                 async with engine.begin() as conn:
                     await conn.run_sync(Base.metadata.create_all)
                 logger.info("Database tables created/verified")
+                
+                # Run schema migration to simplify the database
+                try:
+                    from init_simplified_db import init_simplified_schema
+                    await init_simplified_schema()
+                    logger.info("Schema migration completed successfully")
+                except Exception as e:
+                    logger.warning(f"Schema migration failed (non-critical): {e}")
+                    # Continue anyway - the app can work with existing schema
+                
                 # Initialize RLS policies (safe to run repeatedly)
                 try:
                     await init_rls_policies()
