@@ -91,7 +91,6 @@ async def get_user_stats(
         # Check if database is available
         if not settings.DATABASE_URL:
             # Return mock data if no database
-            from app.schemas import UsageStats
             mock_stats = UsageStats(
                 total_blocks_used=0,
                 blocks_used_today=0,
