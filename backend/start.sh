@@ -19,13 +19,13 @@ else
 fi
 
 echo "Starting uvicorn server..."
-echo "Host: 0.0.0.0"
+echo "Host: :: (IPv6 - Railway v2 requirement)"
 echo "Port: ${PORT:-8000}"
 echo "Log level: info"
 
-# Start the server with minimal configuration for Railway
+# Start the server with IPv6 support for Railway v2
 exec uvicorn main:app \
-    --host 0.0.0.0 \
+    --host :: \
     --port ${PORT:-8000} \
     --log-level info \
     --access-log \
