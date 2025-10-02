@@ -19,7 +19,12 @@ function init() {
           accentColor: '#676FFF',
         },
         embeddedWallets: {
-          createOnLogin: 'all-users',
+          ethereum: {
+            createOnLogin: 'users-without-wallets',
+          },
+          solana: {
+            createOnLogin: 'users-without-wallets',
+          },
           requireUserPasswordOnCreate: false,
           noPromptOnSignature: false,
         },
