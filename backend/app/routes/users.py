@@ -250,13 +250,13 @@ async def sync_block_events(
 
         # Process each block event
         for event in request.events:
-                 # Create or update block usage record
-                 block_usage = BlocksUsage(
-                     user_id=user.user_id,
-                     domain=event.domain,
-                     blocks_used=event.count
-                     # created_at will use the default value from the database
-                 )
+            # Create or update block usage record
+            block_usage = BlocksUsage(
+                user_id=user.user_id,
+                domain=event.domain,
+                blocks_used=event.count
+                # created_at will use the default value from the database
+            )
             db.add(block_usage)
             total_blocks += event.count
             domains_processed.add(event.domain)
