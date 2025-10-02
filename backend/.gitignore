@@ -76,3 +76,4 @@ secrets/
 *.key
 *.cert
 
+backend/nixpacks.toml.backup
