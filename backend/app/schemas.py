@@ -132,7 +132,6 @@ class BlockUsageSync(BaseModel):
 class BlockEvent(BaseModel):
     """Schema for individual block events"""
     domain: str = Field(..., description="Domain that was blocked")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="When the block occurred")
     count: int = Field(default=1, ge=1, description="Number of blocks for this domain")
 
 

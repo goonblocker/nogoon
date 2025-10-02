@@ -197,8 +197,8 @@ async def sync_block_events(
                 user_id=user.user_id,
                 domain=event.domain,
                 blocks_used=event.count,
-                created_at=event.timestamp,
                 is_premium_block=False  # Default to free blocks
+                # created_at will use the default value from the database
             )
             db.add(block_usage)
             total_blocks += event.count

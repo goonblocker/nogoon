@@ -156,7 +156,6 @@ const Popup = () => {
         for (const site of blockingState.blockedSites) {
           events.push({
             domain: site,
-            timestamp: new Date().toISOString(),
             count: 1,
           });
         }
@@ -165,7 +164,6 @@ const Popup = () => {
         console.log('[Popup] No blocked sites found, creating test event');
         events.push({
           domain: 'test-domain.com',
-          timestamp: new Date().toISOString(),
           count: 1,
         });
       }
@@ -779,17 +777,14 @@ const Popup = () => {
                     const testEvents = [
                       {
                         domain: 'example.com',
-                        timestamp: new Date().toISOString(),
                         count: 1,
                       },
                       {
                         domain: 'test-site.com',
-                        timestamp: new Date().toISOString(),
                         count: 2,
                       },
                       {
                         domain: 'demo.org',
-                        timestamp: new Date().toISOString(),
                         count: 1,
                       },
                     ];
