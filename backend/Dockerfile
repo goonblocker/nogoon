@@ -25,5 +25,5 @@ EXPOSE $PORT
 # Make start scripts executable
 RUN chmod +x start.sh start_minimal.sh start_debug.sh
 
-# Start the debug server for testing
-CMD ["./start_debug.sh"]
+# Start the simple test server
+CMD ["python3", "simple_test.py"]
