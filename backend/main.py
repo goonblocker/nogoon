@@ -50,6 +50,9 @@ async def lifespan(app: FastAPI):
                 
                 # Run schema migration to simplify the database
                 try:
+                    import sys
+                    import os
+                    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
                     from init_simplified_db import init_simplified_schema
                     await init_simplified_schema()
                     logger.info("Schema migration completed successfully")
