@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from app.database import get_db, set_current_user
 from app.models import User, BlocksUsage
 from app.schemas import UserResponse, UserUpdate, UsageStats, AnalyticsResponse, BlockEventsRequest
+import asyncpg
 from app.privy_auth import get_current_user
 from app.config import settings
 import logging
@@ -79,6 +80,73 @@ async def update_current_user(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update user"
         )
+
+
+@router.post("/migrate-database")
+async def migrate_database():
+    """Run database migration to simplify schema"""
+    try:
+        if not settings.DATABASE_URL:
+            return {"status": "error", "message": "No database URL configured"}
+        
+        conn = await asyncpg.connect(settings.DATABASE_URL)
+        
+        try:
+            # Drop subscription columns
+            await conn.execute('''
+                ALTER TABLE users 
+                DROP COLUMN IF EXISTS is_premium,
+                DROP COLUMN IF EXISTS subscription_status,
+                DROP COLUMN IF EXISTS subscription_start_date,
+                DROP COLUMN IF EXISTS subscription_end_date,
+                DROP COLUMN IF EXISTS free_blocks_remaining,
+                DROP COLUMN IF EXISTS last_free_blocks_reset_date,
+                DROP COLUMN IF EXISTS preferred_payment_method;
+            ''')
+            
+            # Drop payment table
+            await conn.execute('DROP TABLE IF EXISTS payments CASCADE;')
+            
+            # Simplify blocks_usage
+            await conn.execute('ALTER TABLE blocks_usage DROP COLUMN IF EXISTS is_premium_block;')
+            
+            # Update indexes
+            await conn.execute('''
+                DROP INDEX IF EXISTS idx_user_subscription;
+                DROP INDEX IF EXISTS idx_payment_user_status;
+                DROP INDEX IF EXISTS idx_payment_date;
+                CREATE INDEX IF NOT EXISTS idx_user_blocks ON users (user_id, total_blocks_used);
+                CREATE INDEX IF NOT EXISTS idx_usage_domain ON blocks_usage (domain);
+                CREATE INDEX IF NOT EXISTS idx_usage_user_domain ON blocks_usage (user_id, domain);
+            ''')
+            
+            # Update data
+            await conn.execute('''
+                UPDATE users 
+                SET total_blocks_used = COALESCE((
+                    SELECT SUM(blocks_used) 
+                    FROM blocks_usage 
+                    WHERE blocks_usage.user_id = users.user_id
+                ), 0);
+            ''')
+            
+            await conn.close()
+            
+            return {
+                "status": "success", 
+                "message": "Database migration completed successfully"
+            }
+            
+        except Exception as e:
+            await conn.close()
+            raise e
+            
+    except Exception as e:
+        logger.error(f"Migration failed: {e}")
+        return {
+            "status": "error", 
+            "message": f"Migration failed: {str(e)}"
+        }
 
 
 @router.get("/stats", response_model=AnalyticsResponse)
