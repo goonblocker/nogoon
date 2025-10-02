@@ -6,12 +6,14 @@ type ContentBlockingState = {
   blockedCount: number;
   todayBlockedCount: number;
   lastResetDate: string;
+  blockedSites: string[];
 };
 
 type ContentBlockingStorage = BaseStorage<ContentBlockingState> & {
   toggleProtection: () => Promise<void>;
   incrementBlockCount: () => Promise<void>;
   resetDailyCount: () => Promise<void>;
+  addBlockedSite: (domain: string) => Promise<void>;
 };
 
 const defaultState: ContentBlockingState = {
@@ -19,6 +21,7 @@ const defaultState: ContentBlockingState = {
   blockedCount: 0,
   todayBlockedCount: 0,
   lastResetDate: new Date().toDateString(),
+  blockedSites: [],
 };
 
 const storage = createStorage<ContentBlockingState>('content-blocking-storage', defaultState, {
@@ -54,5 +57,17 @@ export const contentBlockingStorage: ContentBlockingStorage = {
       todayBlockedCount: 0,
       lastResetDate: new Date().toDateString(),
     }));
+  },
+  addBlockedSite: async (domain: string) => {
+    await storage.set(currentState => {
+      // Only add if not already in the list
+      if (!currentState.blockedSites.includes(domain)) {
+        return {
+          ...currentState,
+          blockedSites: [...currentState.blockedSites, domain],
+        };
+      }
+      return currentState;
+    });
   },
 };

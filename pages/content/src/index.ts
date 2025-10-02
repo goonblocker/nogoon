@@ -385,6 +385,12 @@ async function processImage(img: HTMLImageElement) {
         console.error('[Content Script] Failed to increment block count:', err);
       });
 
+      // Track the domain where the block occurred
+      const domain = window.location.hostname;
+      contentBlockingStorage.addBlockedSite(domain).catch(err => {
+        console.error('[Content Script] Failed to add blocked site:', err);
+      });
+
       overlay.classList.add('disallowed');
 
       // Create the overlay content with booba icon and message (mostly standard, occasionally troll)
