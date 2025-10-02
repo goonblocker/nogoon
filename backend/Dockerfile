@@ -9,6 +9,7 @@ COPY requirements.txt ./
 COPY *.py ./
 COPY app/ ./app/
 COPY start.sh ./
+COPY start_minimal.sh ./
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip
@@ -20,8 +21,8 @@ ENV PORT=8000
 # Expose port
 EXPOSE $PORT
 
-# Make start script executable and use it
-RUN chmod +x start.sh
+# Make start scripts executable
+RUN chmod +x start.sh start_minimal.sh
 
-# Start the FastAPI server with debug script
-CMD ["./start.sh"]
+# Start the minimal server for testing
+CMD ["./start_minimal.sh"]
