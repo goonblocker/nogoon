@@ -10,6 +10,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from contextlib import asynccontextmanager
 import logging
+import asyncio
 
 from app.config import settings
 from app.database import engine, Base
@@ -33,14 +34,26 @@ async def lifespan(app: FastAPI):
     logger.info("Starting NoGoon Backend Server...")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
     
+    # Add startup delay for Railway database
+    if settings.DATABASE_URL and "railway" in settings.DATABASE_URL:
+        logger.info("Waiting for Railway database to be ready...")
+        await asyncio.sleep(5)  # Wait 5 seconds for Railway database
+    
     # Create database tables (only if DATABASE_URL is provided)
     if settings.DATABASE_URL:
-        try:
-            async with engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
-            logger.info("Database tables created/verified")
-        except Exception as e:
-            logger.warning(f"Database initialization failed: {e}")
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                async with engine.begin() as conn:
+                    await conn.run_sync(Base.metadata.create_all)
+                logger.info("Database tables created/verified")
+                break
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    logger.warning(f"Database initialization failed (attempt {attempt + 1}), retrying in 3s: {e}")
+                    await asyncio.sleep(3)
+                else:
+                    logger.warning(f"Database initialization failed after {max_retries} attempts: {e}")
     else:
         logger.info("No DATABASE_URL provided, skipping database initialization")
     
@@ -91,14 +104,30 @@ async def health_check():
     try:
         # Test database connection
         db_status = "unknown"
+        db_details = {}
+        
         if settings.DATABASE_URL:
             try:
                 from sqlalchemy import text
+                # Test basic connection
                 async with engine.connect() as conn:
-                    await conn.execute(text("SELECT 1"))
-                    db_status = "connected"
+                    result = await conn.execute(text("SELECT 1 as test"))
+                    row = result.fetchone()
+                    if row and row[0] == 1:
+                        db_status = "connected"
+                        db_details["test_query"] = "success"
+                    
+                    # Test table existence
+                    try:
+                        result = await conn.execute(text("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public'"))
+                        table_count = result.scalar()
+                        db_details["table_count"] = table_count
+                    except Exception as table_error:
+                        db_details["table_error"] = str(table_error)[:50]
+                        
             except Exception as db_error:
                 db_status = f"error: {str(db_error)[:100]}"
+                db_details["error_type"] = type(db_error).__name__
         else:
             db_status = "no_database_url"
         
@@ -107,7 +136,9 @@ async def health_check():
             "environment": settings.ENVIRONMENT,
             "version": "1.0.0",
             "database": db_status,
-            "privy_app_id": settings.PRIVY_APP_ID
+            "database_details": db_details,
+            "privy_app_id": settings.PRIVY_APP_ID,
+            "database_url_preview": settings.DATABASE_URL[:30] + "..." if settings.DATABASE_URL else "none"
         }
     except Exception as e:
         return {

@@ -19,18 +19,29 @@ if settings.DATABASE_URL and not settings.DATABASE_URL.startswith("sqlite"):
     if db_url.startswith("postgresql://"):
         db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
     
+    # Add connection parameters for Railway PostgreSQL
+    if "railway" in db_url:
+        # Add SSL and connection parameters for Railway
+        if "?" not in db_url:
+            db_url += "?sslmode=require"
+        else:
+            db_url += "&sslmode=require"
+    
     engine = create_async_engine(
         db_url,
         echo=settings.ENVIRONMENT == "development",
         pool_pre_ping=True,
-        pool_size=5,  # Reduced pool size for Railway
-        max_overflow=10,  # Reduced overflow for Railway
-        pool_recycle=3600,  # Recycle connections every hour
-        pool_timeout=30,  # Timeout for getting connection from pool
+        pool_size=3,  # Very small pool for Railway
+        max_overflow=5,  # Minimal overflow for Railway
+        pool_recycle=1800,  # Recycle connections every 30 minutes
+        pool_timeout=60,  # Longer timeout for getting connection from pool
         connect_args={
-            "command_timeout": 60,  # Command timeout
+            "command_timeout": 30,  # Shorter command timeout
             "server_settings": {
                 "application_name": "nogoon_backend",
+                "tcp_keepalives_idle": "600",
+                "tcp_keepalives_interval": "30",
+                "tcp_keepalives_count": "3"
             }
         }
     )
