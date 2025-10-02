@@ -19,9 +19,9 @@ class Settings(BaseSettings):
     DATABASE_PUBLIC_URL: str = ""
     
     # Privy Configuration
-    PRIVY_APP_ID: str = "dummy_app_id"
-    PRIVY_APP_SECRET: str = "dummy_app_secret"
-    PRIVY_VERIFICATION_KEY: str = "dummy_verification_key"  # For JWT validation
+    PRIVY_APP_ID: str = "cmg74h4sm0035le0c1k99b1gz"  # Your actual Privy app ID
+    PRIVY_APP_SECRET: str = "dummy_app_secret"  # Not needed for JWKS
+    PRIVY_VERIFICATION_KEY: str = "auto_fetched_from_jwks"  # Auto-fetched from JWKS endpoint
     
     # Security
     SECRET_KEY: str = "dummy_secret_key_for_development"

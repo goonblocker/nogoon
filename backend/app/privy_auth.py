@@ -4,9 +4,12 @@ Based on Privy documentation: https://docs.privy.io
 """
 import jwt
 import httpx
+import base64
 from typing import Optional, Dict
 from fastapi import HTTPException, status
 from app.config import settings
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 import logging
 
 logger = logging.getLogger(__name__)
@@ -18,34 +21,55 @@ class PrivyAuthenticator:
     def __init__(self):
         self.app_id = settings.PRIVY_APP_ID
         self.app_secret = settings.PRIVY_APP_SECRET
-        self.verification_key_url = f"https://auth.privy.io/api/v1/apps/{self.app_id}/verification_key"
+        # Use the correct JWKS endpoint as per Privy documentation
+        self.jwks_url = f"https://auth.privy.io/api/v1/apps/{self.app_id}/jwks.json"
         self._verification_key: Optional[str] = None
     
     async def get_verification_key(self) -> str:
-        """Fetch Privy's public verification key for JWT validation"""
+        """Fetch Privy's public verification key for JWT validation using JWKS endpoint"""
         if self._verification_key:
             return self._verification_key
         
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    self.verification_key_url,
-                    headers={
-                        "Authorization": f"Bearer {self.app_secret}",
-                        "privy-app-id": self.app_id
-                    }
-                )
+                # Use the public JWKS endpoint (no authentication required)
+                response = await client.get(self.jwks_url)
                 response.raise_for_status()
-                data = response.json()
-                self._verification_key = data.get("verification_key")
+                jwks_data = response.json()
                 
-                if not self._verification_key:
-                    raise ValueError("No verification key in response")
+                # Extract the public key from JWKS format
+                if "keys" not in jwks_data or not jwks_data["keys"]:
+                    raise ValueError("No keys found in JWKS response")
                 
-                logger.info("Privy verification key fetched successfully")
+                # Get the first key (Privy typically has one key)
+                key_data = jwks_data["keys"][0]
+                
+                # Convert JWK to PEM format for JWT verification
+                
+                # Extract key components
+                x = base64.urlsafe_b64decode(key_data["x"] + "==")
+                y = base64.urlsafe_b64decode(key_data["y"] + "==")
+                
+                # Create EC public key
+                public_numbers = ec.EllipticCurvePublicNumbers(
+                    int.from_bytes(x, 'big'),
+                    int.from_bytes(y, 'big'),
+                    ec.SECP256R1()
+                )
+                public_key = public_numbers.public_key()
+                
+                # Convert to PEM format
+                pem_key = public_key.public_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PublicFormat.SubjectPublicKeyInfo
+                )
+                
+                self._verification_key = pem_key.decode('utf-8')
+                logger.info("Privy verification key fetched successfully from JWKS")
                 return self._verification_key
+                
         except Exception as e:
-            logger.error(f"Error fetching Privy verification key: {e}")
+            logger.error(f"Error fetching Privy verification key from JWKS: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to fetch authentication verification key"
