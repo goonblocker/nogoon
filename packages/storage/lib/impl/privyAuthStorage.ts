@@ -91,21 +91,7 @@ export const privyAuthStorage: PrivyAuthStorage = {
     }));
   },
   canBlock: async () => {
-    const state = await storage.get();
-
-    // Check if it's a new day and reset if needed
-    const today = new Date().toDateString();
-    if (state.lastFreeBlocksResetDate !== today) {
-      await privyAuthStorage.resetDailyFreeBlocks();
-      return true; // New day, so can block
-    }
-
-    // Premium users can always block
-    if (state.isPremium) {
-      return true;
-    }
-
-    // Free users need remaining blocks
-    return state.freeBlocksRemaining > 0;
+    // $NoGoon MODEL: Always free, no limits, powered by token trading fees
+    return true;
   },
 };
