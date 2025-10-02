@@ -19,9 +19,7 @@ class AuthResponse(BaseModel):
     """Response schema for authentication"""
     status: str = "success"
     user_id: str
-    is_premium: bool
-    free_blocks_remaining: int
-    subscription_status: str
+    total_blocks_used: int
     message: str = "Authentication successful"
     
 
@@ -52,71 +50,13 @@ class UserResponse(BaseModel):
     user_id: str
     email: Optional[str]
     wallet_address: Optional[str]
-    is_premium: bool
-    subscription_status: str
-    free_blocks_remaining: int
     total_blocks_used: int
-    subscription_start_date: Optional[datetime]
-    subscription_end_date: Optional[datetime]
     created_at: datetime
     last_login: Optional[datetime]
     
     class Config:
         from_attributes = True
 
-
-# ============================================================================
-# Payment Schemas
-# ============================================================================
-
-class PaymentMethodBase(BaseModel):
-    """Base payment method"""
-    payment_method: Literal["fiat", "token"] = Field(..., description="Payment method: fiat or token")
-
-
-class FiatPaymentRequest(PaymentMethodBase):
-    """Request schema for fiat payment"""
-    payment_method: Literal["fiat"] = "fiat"
-    stripe_payment_method_id: Optional[str] = None
-    
-
-class TokenPaymentRequest(PaymentMethodBase):
-    """Request schema for token payment"""
-    payment_method: Literal["token"] = "token"
-    chain: Literal["ethereum", "solana"] = Field(..., description="Blockchain network")
-    transaction_hash: str = Field(..., description="Transaction hash on blockchain")
-    from_address: str = Field(..., description="Sender wallet address")
-    token_address: Optional[str] = Field(None, description="Token contract address (for ERC20/SPL tokens)")
-
-
-class PaymentResponse(BaseModel):
-    """Response schema for payment"""
-    status: str
-    payment_id: int
-    amount_usd: float
-    discount_applied: float
-    final_amount: float
-    payment_method: str
-    transaction_status: str
-    subscription_period_start: datetime
-    subscription_period_end: datetime
-    message: str
-    
-    # For token payments
-    transaction_hash: Optional[str] = None
-    chain: Optional[str] = None
-    
-    # For fiat payments
-    stripe_payment_intent_id: Optional[str] = None
-    
-    class Config:
-        from_attributes = True
-
-
-class PaymentVerifyRequest(BaseModel):
-    """Request to verify a payment"""
-    payment_id: int
-    
 
 # ============================================================================
 # Sync Schemas

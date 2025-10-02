@@ -34,9 +34,7 @@ async def login(
             # Return mock response if no database
             return AuthResponse(
                 user_id="mock_user",
-                is_premium=False,
-                free_blocks_remaining=10,
-                subscription_status="free",
+                total_blocks_used=0,
                 message="Authentication successful (mock mode - no database)"
             )
         # Verify Privy token
@@ -64,12 +62,6 @@ async def login(
             if user_data["wallet_address"]:
                 user.wallet_address = user_data["wallet_address"]
             
-            # Check if free blocks need reset (new day)
-            if user.last_free_blocks_reset_date.date() < current_time.date():
-                user.free_blocks_remaining = settings.FREE_BLOCKS_PER_DAY
-                user.last_free_blocks_reset_date = current_time
-                logger.info(f"Reset free blocks for user {user_id}")
-            
             logger.info(f"User {user_id} logged in")
         else:
             # Create new user
@@ -77,8 +69,7 @@ async def login(
                 user_id=user_id,
                 email=user_data["email"],
                 wallet_address=user_data["wallet_address"],
-                free_blocks_remaining=settings.FREE_BLOCKS_PER_DAY,
-                last_free_blocks_reset_date=current_time,
+                total_blocks_used=0,
                 last_login=current_time
             )
             db.add(user)
@@ -89,9 +80,7 @@ async def login(
         
         return AuthResponse(
             user_id=user.user_id,
-            is_premium=user.is_premium,
-            free_blocks_remaining=user.free_blocks_remaining,
-            subscription_status=user.subscription_status,
+            total_blocks_used=user.total_blocks_used,
             message="Authentication successful"
         )
         
@@ -143,19 +132,9 @@ async def verify_token(
                 detail="User not found"
             )
         
-        # Check daily reset
-        current_time = datetime.utcnow()
-        if user.last_free_blocks_reset_date.date() < current_time.date():
-            user.free_blocks_remaining = settings.FREE_BLOCKS_PER_DAY
-            user.last_free_blocks_reset_date = current_time
-            await db.commit()
-            await db.refresh(user)
-        
         return AuthResponse(
             user_id=user.user_id,
-            is_premium=user.is_premium,
-            free_blocks_remaining=user.free_blocks_remaining,
-            subscription_status=user.subscription_status,
+            total_blocks_used=user.total_blocks_used,
             message="Token valid"
         )
         

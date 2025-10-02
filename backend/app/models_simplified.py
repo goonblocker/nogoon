@@ -60,8 +60,6 @@ class BlocksUsage(Base):
     )
 
 
-
-
 class SyncLog(Base):
     """Log sync operations from Chrome extension"""
     __tablename__ = "sync_logs"
@@ -84,4 +82,3 @@ class SyncLog(Base):
     __table_args__ = (
         Index('idx_sync_user_date', 'user_id', 'created_at'),
     )
-
