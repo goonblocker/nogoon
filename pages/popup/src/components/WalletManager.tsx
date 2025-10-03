@@ -131,20 +131,25 @@ export default function WalletManager({ onClose }: WalletManagerProps) {
     switch (chainType) {
       case 'ethereum':
         return (
-          <svg width="20" height="20" viewBox="0 0 32 32" className="text-current">
-            <path
-              fill="currentColor"
-              d="M15.927 23.959l-9.823-5.797 9.817 13.839 9.828-13.839-9.828 5.797zM16.073 0l-9.819 16.297 9.819 5.807 9.823-5.801z"
-            />
+          <svg width="20" height="20" viewBox="0 0 784.37 1277.39" className="text-current">
+            <g fill="currentColor">
+              <polygon points="392.07,0 383.5,29.11 383.5,873.74 392.07,882.29 784.13,650.54" />
+              <polygon points="392.07,0 0,650.54 392.07,882.29 392.07,472.33" />
+              <polygon points="392.07,956.52 387.24,962.41 387.24,1263.28 392.07,1277.38 784.37,724.89" />
+              <polygon points="392.07,1277.38 392.07,956.52 0,724.89" />
+              <polygon points="392.07,882.29 784.13,650.54 392.07,472.33" />
+              <polygon points="0,650.54 392.07,882.29 392.07,472.33" />
+            </g>
           </svg>
         );
       case 'solana':
         return (
-          <svg width="20" height="20" viewBox="0 0 32 32" className="text-current">
-            <path
-              fill="currentColor"
-              d="M6.9 26.4c.4.4 1 .6 1.6.6h21.1c1.2 0 1.8-1.4 1-2.2l-4.3-4.3c-.4-.4-1-.6-1.6-.6H3.6c-1.2 0-1.8 1.4-1 2.2l4.3 4.3zm18.2-20.8c-.4-.4-1-.6-1.6-.6H2.4c-1.2 0-1.8 1.4-1 2.2l4.3 4.3c.4.4 1 .6 1.6.6h21.1c1.2 0 1.8-1.4 1-2.2l-4.3-4.3zM6.9 19.4c.4-.4 1-.6 1.6-.6h21.1c1.2 0 1.8-1.4 1-2.2l-4.3-4.3c-.4-.4-1-.6-1.6-.6H3.6c-1.2 0-1.8 1.4-1 2.2l4.3 4.3z"
-            />
+          <svg width="20" height="20" viewBox="0 0 397.7 311.7" className="text-current">
+            <g fill="currentColor">
+              <path d="M64.6,237.9c2.4-2.4,5.7-3.8,9.2-3.8h317.4c5.8,0,8.7,7,4.6,11.1l-62.7,62.7c-2.4,2.4-5.7,3.8-9.2,3.8H6.5c-5.8,0-8.7-7-4.6-11.1L64.6,237.9z" />
+              <path d="M64.6,3.8C67.1,1.4,70.4,0,73.8,0h317.4c5.8,0,8.7,7,4.6,11.1L333.1,73.8c-2.4,2.4-5.7,3.8-9.2,3.8H6.5c-5.8,0-8.7-7-4.6-11.1L64.6,3.8z" />
+              <path d="M333.1,120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8,0-8.7,7-4.6,11.1l62.7,62.7c2.4,2.4,5.7,3.8,9.2,3.8h317.4c5.8,0,8.7-7,4.6-11.1L333.1,120.1z" />
+            </g>
           </svg>
         );
       default:
@@ -193,11 +198,15 @@ export default function WalletManager({ onClose }: WalletManagerProps) {
         {ethereumWallets.length > 0 && (
           <div className="mb-6">
             <h3 className="text-sm font-black tracking-tighter text-foreground mb-3 flex items-center gap-2">
-              <svg width="16" height="16" viewBox="0 0 32 32" className="text-blue-500">
-                <path
-                  fill="currentColor"
-                  d="M15.927 23.959l-9.823-5.797 9.817 13.839 9.828-13.839-9.828 5.797zM16.073 0l-9.819 16.297 9.819 5.807 9.823-5.801z"
-                />
+              <svg width="16" height="16" viewBox="0 0 784.37 1277.39" className="text-blue-500">
+                <g fill="currentColor">
+                  <polygon points="392.07,0 383.5,29.11 383.5,873.74 392.07,882.29 784.13,650.54" />
+                  <polygon points="392.07,0 0,650.54 392.07,882.29 392.07,472.33" />
+                  <polygon points="392.07,956.52 387.24,962.41 387.24,1263.28 392.07,1277.38 784.37,724.89" />
+                  <polygon points="392.07,1277.38 392.07,956.52 0,724.89" />
+                  <polygon points="392.07,882.29 784.13,650.54 392.07,472.33" />
+                  <polygon points="0,650.54 392.07,882.29 392.07,472.33" />
+                </g>
               </svg>
               Ethereum Wallets ({ethereumWallets.length})
             </h3>
@@ -274,11 +283,12 @@ export default function WalletManager({ onClose }: WalletManagerProps) {
         {solanaWallets.length > 0 && (
           <div className="mb-6">
             <h3 className="text-sm font-black tracking-tighter text-foreground mb-3 flex items-center gap-2">
-              <svg width="16" height="16" viewBox="0 0 32 32" className="text-purple-500">
-                <path
-                  fill="currentColor"
-                  d="M6.9 26.4c.4.4 1 .6 1.6.6h21.1c1.2 0 1.8-1.4 1-2.2l-4.3-4.3c-.4-.4-1-.6-1.6-.6H3.6c-1.2 0-1.8 1.4-1 2.2l4.3 4.3zm18.2-20.8c-.4-.4-1-.6-1.6-.6H2.4c-1.2 0-1.8 1.4-1 2.2l4.3 4.3c.4.4 1 .6 1.6.6h21.1c1.2 0 1.8-1.4 1-2.2l-4.3-4.3zM6.9 19.4c.4-.4 1-.6 1.6-.6h21.1c1.2 0 1.8-1.4 1-2.2l-4.3-4.3c-.4-.4-1-.6-1.6-.6H3.6c-1.2 0-1.8 1.4-1 2.2l4.3 4.3z"
-                />
+              <svg width="16" height="16" viewBox="0 0 397.7 311.7" className="text-purple-500">
+                <g fill="currentColor">
+                  <path d="M64.6,237.9c2.4-2.4,5.7-3.8,9.2-3.8h317.4c5.8,0,8.7,7,4.6,11.1l-62.7,62.7c-2.4,2.4-5.7,3.8-9.2,3.8H6.5c-5.8,0-8.7-7-4.6-11.1L64.6,237.9z" />
+                  <path d="M64.6,3.8C67.1,1.4,70.4,0,73.8,0h317.4c5.8,0,8.7,7,4.6,11.1L333.1,73.8c-2.4,2.4-5.7,3.8-9.2,3.8H6.5c-5.8,0-8.7-7-4.6-11.1L64.6,3.8z" />
+                  <path d="M333.1,120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8,0-8.7,7-4.6,11.1l62.7,62.7c2.4,2.4,5.7,3.8,9.2,3.8h317.4c5.8,0,8.7-7,4.6-11.1L333.1,120.1z" />
+                </g>
               </svg>
               Solana Wallets ({solanaWallets.length})
             </h3>
