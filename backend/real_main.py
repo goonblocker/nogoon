@@ -190,6 +190,13 @@ class AnalyticsResponse(BaseModel):
     status: str = "success"
     stats: UsageStats
 
+class BlockEvent(BaseModel):
+    domain: str
+    count: int = 1
+
+class BlockEventsRequest(BaseModel):
+    events: List[BlockEvent]
+
 # Authentication dependency
 async def get_current_user(authorization: str = Header(...), db: AsyncSession = Depends(get_db)) -> User:
     if not authorization or not authorization.startswith("Bearer "):
@@ -462,6 +469,48 @@ async def get_user_stats(
     except Exception as e:
         logger.error(f"Error getting user stats: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve statistics")
+
+@app.post("/api/v1/users/block-events")
+async def sync_block_events(
+    request: BlockEventsRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Sync block events from extension to database"""
+    try:
+        total_blocks = 0
+        domains_processed = set()
+        
+        # Process each block event
+        for event in request.events:
+            # Create block usage record
+            block_usage = BlocksUsage(
+                user_id=user.user_id,
+                domain=event.domain,
+                blocks_used=event.count
+            )
+            db.add(block_usage)
+            total_blocks += event.count
+            domains_processed.add(event.domain)
+        
+        # Update user's total blocks
+        user.total_blocks_used += total_blocks
+        
+        await db.commit()
+        logger.info(f"Synced {len(request.events)} block events for user {user.user_id}, total blocks: {total_blocks}")
+        
+        return {
+            "status": "success",
+            "message": "Block events synced successfully",
+            "events_processed": len(request.events),
+            "total_blocks_added": total_blocks,
+            "domains_processed": list(domains_processed)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error syncing block events: {e}")
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to sync block events")
 
 if __name__ == "__main__":
     port = int(os.getenv('PORT', 8000))
