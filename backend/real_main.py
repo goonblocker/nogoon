@@ -322,6 +322,72 @@ async def migrate_database():
         logger.error(f"Migration failed: {e}")
         raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
 
+@app.get("/admin/check-schema")
+async def check_schema():
+    """Check current database schema"""
+    if not settings.DATABASE_URL:
+        raise HTTPException(status_code=500, detail="No database configured")
+    
+    try:
+        async with engine.begin() as conn:
+            # List tables
+            result = await conn.execute(text("""
+                SELECT table_name FROM information_schema.tables 
+                WHERE table_schema = 'public' ORDER BY table_name;
+            """))
+            tables = [row[0] for row in result.fetchall()]
+            
+            # Check users table columns
+            users_columns = []
+            if 'users' in tables:
+                result = await conn.execute(text("""
+                    SELECT column_name, data_type 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'users' AND table_schema = 'public'
+                    ORDER BY ordinal_position;
+                """))
+                users_columns = [f"{row[0]} ({row[1]})" for row in result.fetchall()]
+            
+            # Check blocks_usage table columns
+            blocks_columns = []
+            if 'blocks_usage' in tables:
+                result = await conn.execute(text("""
+                    SELECT column_name, data_type 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'blocks_usage' AND table_schema = 'public'
+                    ORDER BY ordinal_position;
+                """))
+                blocks_columns = [f"{row[0]} ({row[1]})" for row in result.fetchall()]
+            
+            # Count records
+            user_count = 0
+            blocks_count = 0
+            if 'users' in tables:
+                result = await conn.execute(text("SELECT COUNT(*) FROM users;"))
+                user_count = result.scalar()
+            if 'blocks_usage' in tables:
+                result = await conn.execute(text("SELECT COUNT(*) FROM blocks_usage;"))
+                blocks_count = result.scalar()
+            
+            return {
+                "status": "success",
+                "tables": tables,
+                "users_table": {
+                    "exists": 'users' in tables,
+                    "columns": users_columns,
+                    "record_count": user_count
+                },
+                "blocks_usage_table": {
+                    "exists": 'blocks_usage' in tables,
+                    "columns": blocks_columns,
+                    "record_count": blocks_count
+                }
+            }
+            
+    except Exception as e:
+        logger.error(f"Schema check failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Schema check failed: {str(e)}")
+
 @app.get("/api/v1/users/stats", response_model=AnalyticsResponse)
 async def get_user_stats(
     user: User = Depends(get_current_user),
