@@ -184,7 +184,7 @@ class UsageStats(BaseModel):
     blocks_used_today: int
     blocks_used_this_week: int
     blocks_used_this_month: int
-    most_blocked_domains: List[Dict[str, int]]
+    most_blocked_domains: List[Dict[str, Any]]
 
 class AnalyticsResponse(BaseModel):
     status: str = "success"
@@ -196,6 +196,15 @@ class BlockEvent(BaseModel):
 
 class BlockEventsRequest(BaseModel):
     events: List[BlockEvent]
+
+class AuthRequest(BaseModel):
+    access_token: str
+
+class AuthResponse(BaseModel):
+    status: str = "success"
+    user_id: str
+    total_blocks_used: int
+    message: str = "Authentication successful"
 
 # Authentication dependency
 async def get_current_user(authorization: str = Header(...), db: AsyncSession = Depends(get_db)) -> User:
@@ -394,6 +403,54 @@ async def check_schema():
     except Exception as e:
         logger.error(f"Schema check failed: {e}")
         raise HTTPException(status_code=500, detail=f"Schema check failed: {str(e)}")
+
+@app.post("/api/v1/auth/login", response_model=AuthResponse)
+async def login(request: AuthRequest, db: AsyncSession = Depends(get_db)):
+    """Authenticate user with Privy token"""
+    try:
+        # Verify the Privy token
+        user_data = await privy_auth.verify_token(request.access_token)
+        user_id = user_data.get("sub")
+        
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+        
+        # Get or create user
+        result = await db.execute(select(User).where(User.user_id == user_id))
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            # Create new user
+            user = User(
+                user_id=user_id,
+                email=user_data.get("email"),
+                wallet_address=user_data.get("wallet", {}).get("address") if user_data.get("wallet") else None,
+                total_blocks_used=0,
+                last_login=datetime.utcnow()
+            )
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+        else:
+            # Update last login
+            user.last_login = datetime.utcnow()
+            await db.commit()
+        
+        return AuthResponse(
+            user_id=user.user_id,
+            total_blocks_used=user.total_blocks_used
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Login error: {e}")
+        raise HTTPException(status_code=500, detail="Authentication failed")
+
+@app.post("/api/v1/auth/verify", response_model=AuthResponse)
+async def verify_token(request: AuthRequest, db: AsyncSession = Depends(get_db)):
+    """Verify Privy token (alias for login)"""
+    return await login(request, db)
 
 @app.get("/api/v1/users/stats", response_model=AnalyticsResponse)
 async def get_user_stats(
