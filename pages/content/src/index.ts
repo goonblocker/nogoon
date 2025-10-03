@@ -1,11 +1,14 @@
 import { contentBlockingStorage, privyAuthStorage } from '@extension/storage';
 
-console.log('Content script loaded - v4 - Background Communication');
+console.log('Content script loaded - v5 - Performance Optimized');
 
 // --- Global State ---
 let isEnabled = true; // Will be synced with storage
 const NSFW_THRESHOLD = 0.2; // Probability threshold for NSFW categories
 const processedImages = new WeakSet<HTMLImageElement>();
+const processingQueue = new Set<string>(); // Track URLs being processed to avoid duplicates
+let activeProcessingCount = 0; // Track concurrent processing
+const MAX_CONCURRENT_PROCESSING = 3; // Limit concurrent image processing
 
 // Initialize state from storage
 contentBlockingStorage.get().then(state => {
@@ -176,23 +179,81 @@ function getBlockMessage(): string {
 // Booba gif icon
 const boobaIconHTML = `<img src="${chrome.runtime.getURL('/booba.gif')}" class="eye-icon" alt="NoGoon" />`;
 
+// --- Helper Functions for Performance ---
+
+/**
+ * Check if an image is likely non-content (ads, tracking pixels, icons, etc.)
+ * Skip these to improve performance
+ */
+function isLikelyNonContentImage(img: HTMLImageElement): boolean {
+  const src = img.src.toLowerCase();
+  const width = img.naturalWidth || img.offsetWidth;
+  const height = img.naturalHeight || img.offsetHeight;
+
+  // Skip very small images (likely tracking pixels, icons)
+  if (width < 100 || height < 100) {
+    return true;
+  }
+
+  // Skip common ad/tracking/icon domains and patterns
+  const skipPatterns = [
+    'doubleclick.net',
+    'google-analytics.com',
+    'googletagmanager.com',
+    'facebook.com/tr',
+    'analytics.',
+    '/pixel.',
+    '/tracking.',
+    '/beacon.',
+    'favicon',
+    '.ico',
+    '.svg',
+    '/logo',
+    '/icon',
+  ];
+
+  if (skipPatterns.some(pattern => src.includes(pattern))) {
+    return true;
+  }
+
+  // Skip if image has class names suggesting it's UI/chrome
+  const className = img.className.toLowerCase();
+  if (
+    className.includes('icon') ||
+    className.includes('logo') ||
+    className.includes('avatar') ||
+    className.includes('badge')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Throttle function to limit how often a function can be called
+ */
+function throttle<T extends (...args: any[]) => any>(func: T, limit: number): T {
+  let inThrottle: boolean;
+  return function (this: any, ...args: any[]) {
+    if (!inThrottle) {
+      func.apply(this, args);
+      inThrottle = true;
+      setTimeout(() => (inThrottle = false), limit);
+    }
+  } as T;
+}
+
 // --- Communication with Background ---
 async function classifyImageWithBackground(imageUrl: string): Promise<'allowed' | 'disallowed' | 'error'> {
-  console.log('[AIDEBUGLOGDETECTIVEWORK]: Entering classifyImageWithBackground for URL:', imageUrl);
-  console.log('[Content Script] Sending image URL to background:', imageUrl);
   try {
-    console.log('[AIDEBUGLOGDETECTIVEWORK]: Sending message to background script.');
     const response = await chrome.runtime.sendMessage({
       type: 'classifyImage',
       imageUrl: imageUrl,
     });
-    console.log('[AIDEBUGLOGDETECTIVEWORK]: Received response from background:', response);
-
-    console.log('[Content Script] Received response from background:', response);
 
     if (response.status === 'error') {
-      console.error('[Content Script] Error from background:', response.message);
-      console.error('[AIDEBUGLOGDETECTIVEWORK]: Background script reported error:', response.message);
+      console.error('[Content Script] Classification error:', response.message);
       return 'error';
     }
 
@@ -203,20 +264,19 @@ async function classifyImageWithBackground(imageUrl: string): Promise<'allowed' 
           (prediction.className === 'Porn' || prediction.className === 'Sexy' || prediction.className === 'Hentai') &&
           prediction.probability >= NSFW_THRESHOLD,
       );
-      return isNsfw ? 'disallowed' : 'allowed';
+      const result = isNsfw ? 'disallowed' : 'allowed';
+      console.log(`[Content Script] Image classified as ${result}:`, imageUrl.substring(0, 50));
+      return result;
     } else {
-      console.error('[Content Script] Invalid response structure from background:', response);
-      console.error('[AIDEBUGLOGDETECTIVEWORK]: Invalid response structure:', response);
+      console.error('[Content Script] Invalid response from background');
       return 'error';
     }
   } catch (error) {
-    console.error('[AIDEBUGLOGDETECTIVEWORK]: Error caught in classifyImageWithBackground:', error);
-    console.error('[Content Script] Error sending message to background:', error);
     // Check for specific disconnect error which might mean the background script isn't ready
-    // Fix: Cast error to check its message property safely
     if (error instanceof Error && error.message.includes('Could not establish connection')) {
-      console.warn('[Content Script] Background script might be reloading or unavailable.');
-      console.warn('[AIDEBUGLOGDETECTIVEWORK]: Connection error - background script might be unavailable.');
+      console.warn('[Content Script] Background script unavailable');
+    } else {
+      console.error('[Content Script] Classification error:', error);
     }
     return 'error';
   }
@@ -275,125 +335,129 @@ function unwrapImage(img: HTMLImageElement, wrapper: HTMLElement) {
  */
 async function processImage(img: HTMLImageElement) {
   // Basic checks
-  console.log('[AIDEBUGLOGDETECTIVEWORK]: Entering processImage for:', img.src);
   if (
     !isEnabled ||
     processedImages.has(img) ||
     img.closest('.content-blocker-container') || // Already being processed
     !img.src ||
-    img.src.startsWith('data:') || // Skip data URIs for now
+    img.src.startsWith('data:') || // Skip data URIs
     !img.src.startsWith('http') // Skip relative URLs, chrome-extension:// etc.
   ) {
     return;
   }
 
+  // Skip non-content images for better performance
+  if (isLikelyNonContentImage(img)) {
+    processedImages.add(img); // Mark as processed so we don't check again
+    return;
+  }
+
   // Initial dimension check
-  const minDimensionInitial = 20;
+  const minDimensionInitial = 100; // Increased from 20 to 100 for performance
   if (img.offsetWidth < minDimensionInitial && img.offsetHeight < minDimensionInitial) {
     // Don't add to processedImages yet, might become visible later
     return;
   }
 
-  // $NoGoon MODEL: No paywall, always free, powered by token trading fees
-  console.log('[Content Script] Processing image - powered by $NoGoon trading volume');
+  // Check if we're already processing this URL
+  const imageUrl = img.src;
+  if (processingQueue.has(imageUrl)) {
+    console.log('[Content Script] Already processing this URL, skipping:', imageUrl);
+    return;
+  }
+
+  // Limit concurrent processing to avoid overwhelming the page
+  if (activeProcessingCount >= MAX_CONCURRENT_PROCESSING) {
+    console.log('[Content Script] Max concurrent processing reached, queuing for later');
+    // Try again after a delay
+    setTimeout(() => processImage(img), 500);
+    return;
+  }
 
   processedImages.add(img);
-  console.log('[AIDEBUGLOGDETECTIVEWORK]: Added image to processedImages:', img.src);
-  console.log('[Content Script] Processing image:', img.src);
+  processingQueue.add(imageUrl);
+  activeProcessingCount++;
+
+  // Cleanup helper
+  const cleanup = () => {
+    processingQueue.delete(imageUrl);
+    activeProcessingCount = Math.max(0, activeProcessingCount - 1);
+  };
 
   // 1. Wrap the image
-  console.log('[AIDEBUGLOGDETECTIVEWORK]: Wrapping image:', img.src);
   const wrapper = wrapImage(img);
   if (!wrapper) {
-    console.warn('[Content Script] Could not wrap image:', img.src);
-    processedImages.delete(img); // Allow reprocessing
+    processedImages.delete(img);
+    cleanup();
     return;
   }
 
   // 2. Create and add the initial 'scanning' overlay
   const overlay = createOverlayElement('Scanning...');
   wrapper.appendChild(overlay);
-  console.log('[AIDEBUGLOGDETECTIVEWORK]: Added scanning overlay for:', img.src);
 
-  // 3. Wait for the image to be loaded (if not already)
-  if (!img.complete) {
-    try {
-      console.log('[AIDEBUGLOGDETECTIVEWORK]: Image not complete, awaiting decode():', img.src);
-      await img.decode(); // More modern way to wait for image load
-      console.log('[AIDEBUGLOGDETECTIVEWORK]: Image decode() successful:', img.src);
-    } catch (e) {
-      console.log('[AIDEBUGLOGDETECTIVEWORK]: Image decode() failed:', img.src, e);
-      console.log('[Content Script] Image failed to load/decode:', img.src, e);
+  try {
+    // 3. Wait for the image to be loaded (if not already)
+    if (!img.complete) {
+      try {
+        await img.decode(); // More modern way to wait for image load
+      } catch (e) {
+        console.log('[Content Script] Image failed to load/decode:', img.src, e);
+        unwrapImage(img, wrapper);
+        processedImages.delete(img); // Allow reprocessing if src changes
+        cleanup();
+        return;
+      }
+    }
+
+    // 4. Dimension check *after* load
+    const minDimensionFinal = 100; // Increased from 30 to 100
+    if (img.naturalWidth < minDimensionFinal || img.naturalHeight < minDimensionFinal) {
+      console.log(
+        '[Content Script] Skipping small image after load:',
+        img.src,
+        `(${img.naturalWidth}x${img.naturalHeight})`,
+      );
       unwrapImage(img, wrapper);
-      processedImages.delete(img); // Allow reprocessing if src changes
+      cleanup();
+      // Keep in processedImages as it met initial criteria but is too small finally
       return;
     }
-  }
 
-  // 4. Dimension check *after* load
-  const minDimensionFinal = 30;
-  if (img.naturalWidth < minDimensionFinal || img.naturalHeight < minDimensionFinal) {
-    console.log(
-      '[AIDEBUGLOGDETECTIVEWORK]: Skipping tiny image after load:',
-      img.src,
-      `(${img.naturalWidth}x${img.naturalHeight})`,
-    );
-    console.log(
-      '[Content Script] Skipping tiny image after load:',
-      img.src,
-      `(${img.naturalWidth}x${img.naturalHeight})`,
-    );
-    unwrapImage(img, wrapper);
-    // Keep in processedImages as it met initial criteria but is too small finally
-    return;
-  }
+    // Keep wrapper size to displayed dimensions
+    wrapper.style.width = `${img.offsetWidth}px`;
+    wrapper.style.height = `${img.offsetHeight}px`;
 
-  // Keep wrapper size to displayed dimensions (offsetWidth/Height) for proper overlay positioning
-  // This ensures the overlay centers on what's actually visible, not the natural image size
-  wrapper.style.width = `${img.offsetWidth}px`;
-  wrapper.style.height = `${img.offsetHeight}px`;
-
-  // 5. Run the actual detection via background script
-  try {
-    // Ensure absolute URL for fetch in background script
+    // 5. Run the actual detection via background script
     const absoluteUrl = new URL(img.src, document.baseURI).href;
-    console.log('[AIDEBUGLOGDETECTIVEWORK]: Calling classifyImageWithBackground with absolute URL:', absoluteUrl);
     const result = await classifyImageWithBackground(absoluteUrl);
-    console.log('[AIDEBUGLOGDETECTIVEWORK]: classifyImageWithBackground result:', result, 'for URL:', absoluteUrl);
 
     if (result === 'allowed') {
-      console.log('[AIDEBUGLOGDETECTIVEWORK]: Image allowed, removing overlay for:', img.src);
       console.log('[Content Script] Image allowed:', img.src);
       overlay.style.opacity = '0';
       setTimeout(() => {
-        // Check if overlay still exists before removing
         if (overlay.parentNode) {
           overlay.remove();
         }
-        // Optionally unwrap if you only want the container for blocked images
-        // unwrapImage(img, wrapper);
+        cleanup();
       }, 300);
     } else if (result === 'disallowed') {
-      console.log('[AIDEBUGLOGDETECTIVEWORK]: Image disallowed, setting overlay text for:', img.src);
-      console.log('[Content Script] Image disallowed:', img.src);
-
-      // $NoGoon MODEL: No block limits, powered by token trading fees
-      console.log('[Content Script] Block successful - powered by $NoGoon community');
+      console.log('[Content Script] Image blocked:', img.src);
 
       // Increment block count in storage
-      contentBlockingStorage.incrementBlockCount().catch(err => {
+      await contentBlockingStorage.incrementBlockCount().catch(err => {
         console.error('[Content Script] Failed to increment block count:', err);
       });
 
       // Track the domain where the block occurred
       const domain = window.location.hostname;
-      contentBlockingStorage.addBlockedSite(domain).catch(err => {
+      await contentBlockingStorage.addBlockedSite(domain).catch(err => {
         console.error('[Content Script] Failed to add blocked site:', err);
       });
 
       overlay.classList.add('disallowed');
 
-      // Create the overlay content with booba icon and message (mostly standard, occasionally troll)
+      // Create the overlay content with booba icon and message
       const blockMessage = getBlockMessage();
       overlay.innerHTML = `
         ${boobaIconHTML}
@@ -407,72 +471,78 @@ async function processImage(img: HTMLImageElement) {
           if (overlay.parentNode) {
             overlay.remove();
           }
-          // Optionally unwrap after reveal
-          // unwrapImage(img, wrapper);
         },
         { once: true },
       );
+
+      cleanup();
     } else {
       // result === 'error'
-      console.log('[AIDEBUGLOGDETECTIVEWORK]: Classification error, removing overlay for:', img.src);
       console.log('[Content Script] Error classifying image, removing overlay:', img.src);
       overlay.style.opacity = '0';
       setTimeout(() => {
         if (overlay.parentNode) {
           overlay.remove();
         }
-        // Optionally unwrap on error
-        // unwrapImage(img, wrapper);
+        cleanup();
       }, 500);
     }
   } catch (error) {
-    console.error('[AIDEBUGLOGDETECTIVEWORK]: Unexpected error in processImage classification block:', error, img.src);
-    console.error('[Content Script] Unexpected error during classification process:', error, img.src);
-    if (overlay.parentNode) {
-      overlay.textContent = 'Error';
-      overlay.style.opacity = '0';
+    console.error('[Content Script] Unexpected error during classification process:', error);
+    const errorOverlay = wrapper.querySelector('.content-blocker-overlay');
+    if (errorOverlay) {
+      errorOverlay.textContent = 'Error';
+      (errorOverlay as HTMLElement).style.opacity = '0';
       setTimeout(() => {
-        if (overlay.parentNode) {
-          overlay.remove();
+        if (errorOverlay.parentNode) {
+          errorOverlay.remove();
         }
-        // Optionally unwrap on error
-        // unwrapImage(img, wrapper);
       }, 500);
     }
+    cleanup();
   }
 }
 
 // --- Mutation Observer ---
 let observer: MutationObserver | null = null;
+let mutationBuffer: HTMLImageElement[] = [];
+let mutationTimeout: number | null = null;
+
+// Debounced mutation handler - processes images in batches instead of one-by-one
+function processMutationBuffer() {
+  if (mutationBuffer.length === 0) return;
+
+  console.log(`[Content Script] Processing ${mutationBuffer.length} new images from mutations`);
+  const imagesToProcess = [...mutationBuffer];
+  mutationBuffer = [];
+
+  // Process in small batches to avoid blocking
+  imagesToProcess.forEach((img, index) => {
+    setTimeout(() => processImage(img), index * 50); // Stagger by 50ms
+  });
+}
 
 function createObserver() {
   return new MutationObserver(mutations => {
-    // console.log('[AIDEBUGLOGDETECTIVEWORK]: MutationObserver triggered.'); // This can be very noisy
     if (!isEnabled) return;
 
     mutations.forEach(mutation => {
-      // Handle added nodes
+      // Handle added nodes - only look for IMG tags
       mutation.addedNodes.forEach(node => {
         if (node.nodeType === Node.ELEMENT_NODE) {
           const element = node as Element;
+
           // Process new IMG tags directly
           if (element.tagName === 'IMG') {
-            // console.log('[AIDEBUGLOGDETECTIVEWORK]: New IMG detected directly:', (element as HTMLImageElement).src);
-            processImage(element as HTMLImageElement);
+            mutationBuffer.push(element as HTMLImageElement);
           }
-          // Process IMG tags within added subtrees
-          element.querySelectorAll('img').forEach(img => {
-            // console.log('[AIDEBUGLOGDETECTIVEWORK]: New IMG detected in subtree:', img.src);
-            processImage(img);
-          });
-          // Look for background images (basic check)
-          if (element instanceof HTMLElement) {
-            const style = window.getComputedStyle(element);
-            if (style.backgroundImage && style.backgroundImage !== 'none') {
-              // TODO: Extract URL from background-image and process if it's an image
-              // This is more complex due to multiple backgrounds, gradients etc.
-              // console.log('Found background image on:', element);
-            }
+
+          // Process IMG tags within added subtrees - but limit depth
+          if (element.children.length > 0 && element.children.length < 50) {
+            // Avoid huge subtrees
+            element.querySelectorAll('img').forEach(img => {
+              mutationBuffer.push(img);
+            });
           }
         }
       });
@@ -484,38 +554,22 @@ function createObserver() {
         mutation.target.nodeName === 'IMG'
       ) {
         const img = mutation.target as HTMLImageElement;
-        console.log(
-          '[AIDEBUGLOGDETECTIVEWORK]: Attribute changed on IMG:',
-          mutation.attributeName,
-          'New src:',
-          img.src,
-        );
         // If src changes, remove from processed set and re-evaluate
-        // Check if it's currently wrapped
         const wrapper = img.closest('.content-blocker-container');
         if (wrapper) {
-          console.log('[Content Script] Src changed on wrapped image, unwrapping:', img.src);
           unwrapImage(img, wrapper as HTMLElement);
         }
         processedImages.delete(img);
-        // Reprocess after a short delay to allow attributes to settle
-        console.log('[AIDEBUGLOGDETECTIVEWORK]: Scheduling reprocess for src change:', img.src);
-        setTimeout(() => processImage(img), 50);
-      }
-      // Handle style changes that might add a background image
-      if (
-        mutation.type === 'attributes' &&
-        mutation.attributeName === 'style' &&
-        mutation.target instanceof HTMLElement
-      ) {
-        const element = mutation.target as HTMLElement;
-        const style = window.getComputedStyle(element);
-        if (style.backgroundImage && style.backgroundImage !== 'none') {
-          // TODO: Extract URL and process if new/changed and an image
-          // console.log('Found potential background image change on:', element);
-        }
+        // Add to buffer for batch processing
+        mutationBuffer.push(img);
       }
     });
+
+    // Debounce: process buffer after mutations settle
+    if (mutationTimeout) {
+      clearTimeout(mutationTimeout);
+    }
+    mutationTimeout = window.setTimeout(processMutationBuffer, 200);
   });
 }
 
@@ -545,33 +599,41 @@ function stopObserver() {
 // --- Initialization ---
 function initializeContentScript() {
   console.log('[Content Script] Initializing content script...');
-  console.log('[AIDEBUGLOGDETECTIVEWORK]: Initializing content script.');
 
   // Only start processing if protection is enabled
   if (isEnabled) {
-    console.log('[Content Script] Protection is enabled, starting observer and processing images...');
+    console.log('[Content Script] Protection is enabled, starting observer...');
     startObserver();
 
-    // Process images already present on the page
-    console.log('[AIDEBUGLOGDETECTIVEWORK]: Processing initially present images.');
-    document.querySelectorAll('img').forEach(img => {
-      processImage(img);
-    });
-    // Process initial background images (basic)
-    document.querySelectorAll('*').forEach(element => {
-      if (element instanceof HTMLElement) {
-        const style = window.getComputedStyle(element);
-        if (style.backgroundImage && style.backgroundImage !== 'none') {
-          // TODO: Extract URL and process
-          // console.log('Found initial background image on:', element);
-        }
+    // Process images already present on the page - use throttled batch processing
+    console.log('[Content Script] Processing initially present images...');
+    const images = Array.from(document.querySelectorAll('img'));
+    console.log(`[Content Script] Found ${images.length} images to process`);
+
+    // Process images in batches to avoid overwhelming the page
+    let processedCount = 0;
+    const batchSize = 5;
+
+    function processBatch() {
+      const batch = images.slice(processedCount, processedCount + batchSize);
+      batch.forEach(img => processImage(img));
+      processedCount += batch.length;
+
+      if (processedCount < images.length) {
+        // Continue with next batch after a delay
+        setTimeout(processBatch, 100);
+      } else {
+        console.log('[Content Script] Initial image processing complete.');
       }
-    });
+    }
+
+    // Start processing in batches
+    processBatch();
   } else {
     console.log('[Content Script] Protection is disabled, skipping image processing.');
   }
 
-  console.log('[Content Script] Initialization complete.');
+  console.log('[Content Script] Initialization started.');
 }
 
 // Wait for DOM ready before initializing
