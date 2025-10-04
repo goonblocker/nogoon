@@ -1,0 +1,79 @@
+{
+  "manifest_version": 3,
+  "default_locale": "en",
+  "name": "__MSG_extensionName__",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "example@example.com",
+      "strict_min_version": "109.0"
+    }
+  },
+  "version": "0.4.3",
+  "description": "__MSG_extensionDescription__",
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "permissions": [
+    "storage",
+    "scripting",
+    "tabs",
+    "notifications",
+    "sidePanel"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_icon": "icon-34-1.png",
+    "default_title": "Open NoGoon"
+  },
+  "side_panel": {
+    "default_path": "popup/index.html"
+  },
+  "chrome_url_overrides": {},
+  "icons": {
+    "128": "icon-128-1.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*",
+        "<all_urls>"
+      ],
+      "js": [
+        "content/index.iife.js"
+      ]
+    },
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*",
+        "<all_urls>"
+      ],
+      "css": [
+        "content.css"
+      ]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "*.js",
+        "*.css",
+        "*.svg",
+        "icon-128-1.png",
+        "icon-34-1.png",
+        "booba.gif",
+        "nsfw_model/*"
+      ],
+      "matches": [
+        "*://*/*"
+      ]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https: wss: http://localhost:* ws://localhost:*;"
+  }
+}
