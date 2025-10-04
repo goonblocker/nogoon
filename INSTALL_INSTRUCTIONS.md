@@ -98,7 +98,7 @@ Please test these features and report any issues:
 
 ### Please Report:
 
-**Where**: https://github.com/Alex-Alaniz/content-blocking-extension/issues
+**Where**: https://github.com/goonblocker/nogoon/issues
 
 **Include**:
 1. What you were doing
@@ -204,7 +204,7 @@ Your testing helps us:
 
 ## 📞 Need Help?
 
-- **GitHub Issues**: https://github.com/Alex-Alaniz/content-blocking-extension/issues
+- **GitHub Issues**: https://github.com/goonblocker/nogoon/issues
 - **Documentation**: See repository README
 - **Community**: [Your Discord/Telegram link]
 

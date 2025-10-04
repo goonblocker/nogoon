@@ -137,11 +137,11 @@ Thank you for being an early tester and helping us improve NoGoon before the off
 
 ## 🔗 Links
 
-- **Repository**: https://github.com/Alex-Alaniz/content-blocking-extension
+- **Repository**: https://github.com/goonblocker/nogoon
 - **Documentation**: See README.md
 - **Privacy Policy**: See PRIVACY_POLICY.md
 - **Installation Help**: See INSTALL_INSTRUCTIONS.md
-- **Report Issues**: https://github.com/Alex-Alaniz/content-blocking-extension/issues
+- **Report Issues**: https://github.com/goonblocker/nogoon/issues
 
 ---
 

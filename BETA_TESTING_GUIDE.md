@@ -15,7 +15,7 @@ There are several ways to let your community test the extension without requirin
 ```bash
 # Your extension is already built in dist/
 # Create a shareable ZIP of the dist folder
-cd /Users/alexalaniz/Documents/GitHub/content-blocking-extension
+cd /Users/alexalaniz/Documents/GitHub/nogoon
 zip -r nogoon-beta-v0.4.3.zip dist/*
 ```
 
@@ -152,7 +152,7 @@ git tag -a v0.4.3-beta -m "Beta release for community testing"
 git push origin v0.4.3-beta
 
 # Then on GitHub:
-1. Go to: https://github.com/Alex-Alaniz/content-blocking-extension/releases
+1. Go to: https://github.com/goonblocker/nogoon/releases
 2. Click "Create a new release"
 3. Choose tag: v0.4.3-beta
 4. Title: "NoGoon v0.4.3 - Beta Release"
@@ -193,7 +193,7 @@ Thanks for testing NoGoon!
 - ✅ Performance on different websites
 
 ### Found a Bug?
-Open an issue: https://github.com/Alex-Alaniz/content-blocking-extension/issues
+Open an issue: https://github.com/goonblocker/nogoon/issues
 
 **Thank you for being an early tester! 🙏**
 ```
@@ -274,7 +274,7 @@ Let me help you create one right now:
 
 ```bash
 # Create a clean package without node_modules
-cd /Users/alexalaniz/Documents/GitHub/content-blocking-extension
+cd /Users/alexalaniz/Documents/GitHub/nogoon
 
 # The dist folder is already built and ready
 # Create a release-ready ZIP
@@ -293,7 +293,7 @@ git push origin v0.4.3-beta
 
 ### Step 3: Create GitHub Release
 
-Go to: https://github.com/Alex-Alaniz/content-blocking-extension/releases/new
+Go to: https://github.com/goonblocker/nogoon/releases/new
 
 **Fill in:**
 - **Tag**: v0.4.3-beta (select the tag you just created)
@@ -356,7 +356,7 @@ Please test these features:
 
 ## 🐛 Found a Bug?
 
-Open an issue: https://github.com/Alex-Alaniz/content-blocking-extension/issues
+Open an issue: https://github.com/goonblocker/nogoon/issues
 
 Include:
 - What you were doing
